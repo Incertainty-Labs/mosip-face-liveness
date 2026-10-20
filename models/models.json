@@ -13,6 +13,26 @@
       "notes": "Face box and 5 landmarks. BGR, 0-255, no normalisation; fixed 640x640 input, so frames are letterboxed."
     },
     {
+      "name": "facemesh_v2",
+      "file": "facemesh_v2_256.onnx",
+      "version": "2022sep",
+      "sha256": "6d7932bdefc38871f57dd915b8c723d855e599f29cf4cdf19616fb35d0ed572e",
+      "license": "Apache-2.0",
+      "source": "https://github.com/PINTO0309/PINTO_model_zoo/tree/main/410_FaceMeshV2",
+      "input": [-1, 3, 256, 256],
+      "notes": "MediaPipe Face Mesh V2 (Copyright Google LLC, model card https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Face%20Mesh%20V2.pdf): 478 x 3 landmarks from a 256x256 face crop. ONNX conversion by PINTO model zoo (modified from the original TFLite)."
+    },
+    {
+      "name": "blendshape_v2",
+      "file": "blendshape_v2_146x2.onnx",
+      "version": "2022nov",
+      "sha256": "79065a18016da3b95f71247ff9ade3fe09b9124903a26a1af85af6d9e2a4faf3",
+      "license": "Apache-2.0",
+      "source": "https://github.com/PINTO0309/PINTO_model_zoo/tree/main/390_BlendshapeV2",
+      "input": [-1, 146, 2],
+      "notes": "MediaPipe Blendshape V2 (Copyright Google LLC, model card https://storage.googleapis.com/mediapipe-assets/Model%20Card%20Blendshape%20V2.pdf): 52 blendshape scores (eyeBlink, jawOpen, mouthSmile...) from 146 of the 478 landmarks. ONNX conversion by PINTO model zoo (modified from the original TFLite)."
+    },
+    {
       "name": "sface",
       "file": "face_recognition_sface_2021dec.onnx",
       "version": "2021dec",

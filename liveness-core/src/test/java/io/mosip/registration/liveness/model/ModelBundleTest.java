@@ -40,12 +40,21 @@ class ModelBundleTest {
     }
 
     @Test
-    @DisplayName("The manifest lists the detector, matcher and both PAD models")
+    @DisplayName("The manifest lists the detector, landmarks, blendshapes, matcher and both PAD models")
     void manifestListsTheShippedModels() throws Exception {
         Set<String> names = new HashSet<String>();
         models().forEach(m -> names.add(m.get("name").asText()));
 
-        assertEquals(new HashSet<String>(Arrays.asList("yunet", "sface", "minifasnet_v2", "minifasnet_v1se")), names);
+        assertEquals(new HashSet<String>(Arrays.asList("yunet", "facemesh_v2", "blendshape_v2", "sface",
+                "minifasnet_v2", "minifasnet_v1se")), names);
+    }
+
+    @Test
+    @DisplayName("The licence texts the bundled models require are shipped with them")
+    void licenceTextsAreShipped() {
+        assertAll(
+                () -> assertTrue(new File(MODEL_DIR, "licenses/Apache-2.0.txt").isFile(), "Apache-2.0"),
+                () -> assertTrue(new File(MODEL_DIR, "licenses/MIT-YuNet.txt").isFile(), "MIT for YuNet"));
     }
 
     @ParameterizedTest(name = "{0}")
