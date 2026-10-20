@@ -1,6 +1,8 @@
+# JitPack's image defaults to JDK 17; liveness-desktop and liveness-eval need 21.
+# SDKMAN identifiers are exact (there is no "21-open" alias); check with `sdk list java` when bumping.
 before_install:
-  - sdk install java 21-open
-  - sdk use java 21-open
+  - sdk install java 21.0.12+1.1-tem
+  - sdk use java 21.0.12+1.1-tem
 install:
   - mvn wrapper:wrapper -Dmaven=3.9.9
   - ./mvnw -B install -DskipTests

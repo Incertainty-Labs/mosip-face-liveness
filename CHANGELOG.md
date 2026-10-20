@@ -4,6 +4,14 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-20
+
+Same code as 0.1.1, which did not publish on JitPack.
+
+### Fixed
+
+- `jitpack.yml` now installs an exact SDKMAN JDK 21 identifier (`21.0.12+1.1-tem`); `21-open` does not exist, so JitPack fell back to JDK 17 and could not compile the Java 21 modules.
+
 ## [0.1.1] - 2026-10-20
 
 ### Added
