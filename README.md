@@ -46,7 +46,9 @@ Published through JitPack once tagged:
 </dependency>
 ```
 
-The host application supplies ONNX Runtime 1.28.0: `com.microsoft.onnxruntime:onnxruntime` on Desktop, `com.microsoft.onnxruntime:onnxruntime-android` on Android.
+The host application supplies ONNX Runtime: `com.microsoft.onnxruntime:onnxruntime:1.20.0` on Desktop (the newest that loads under the Registration Client's bundled Zulu 21.0.3) and `com.microsoft.onnxruntime:onnxruntime-android:1.28.0` on Android.
+
+Models ship in [`models/`](models/) with their SHA-256 hashes, licences and sources in [`models/models.json`](models/models.json). `tools/export_minifasnet.py` regenerates the MiniFASNet ONNX files from the upstream weights and checks them against PyTorch.
 
 ## Licence
 

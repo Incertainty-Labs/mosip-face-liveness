@@ -33,8 +33,11 @@
         <!-- Shared modules run on Android API 28: compiling with release 8 turns any missing API into a compile error. -->
         <maven.compiler.release>8</maven.compiler.release>
 
-        <onnxruntime.version>1.28.0</onnxruntime.version>
+        <!-- Desktop pin: the Registration Client ships Zulu 21.0.3, whose bundled MSVC runtime cannot load ONNX Runtime 1.21+.
+             Android uses onnxruntime-android 1.28.0 (API.md §2). Shared modules compile against this version. -->
+        <onnxruntime.version>1.20.0</onnxruntime.version>
         <junit.version>5.11.4</junit.version>
+        <jackson.version>2.17.2</jackson.version>
 
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>

@@ -21,5 +21,12 @@
             <artifactId>onnxruntime</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- Tests only: reads models/models.json; never a runtime dependency of the shared module. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
