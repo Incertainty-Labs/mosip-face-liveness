@@ -5,6 +5,7 @@ import io.mosip.registration.liveness.api.LivenessMode;
 import io.mosip.registration.liveness.api.LivenessPolicy;
 import io.mosip.registration.liveness.api.MaxRetriesAction;
 import io.mosip.registration.liveness.api.Workflow;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -56,6 +57,8 @@ public final class LivenessConfigLoader {
     public static final boolean DEFAULT_BIND_CAPTURE_ENABLED = true;
     /** Default for {@code bind.min.similarity}. */
     public static final double DEFAULT_BIND_MIN_SIMILARITY = 0.60;
+    /** Upper bound for {@code challenge.min.count} and {@code challenge.max.count}. */
+    public static final int MAX_CHALLENGES = 5;
 
     private LivenessConfigLoader() {
     }
@@ -71,22 +74,32 @@ public final class LivenessConfigLoader {
     public static LivenessPolicy load(Map<String, String> config, Workflow workflow) {
         LivenessPolicy.Builder b = LivenessPolicy.builder(workflow);
         Resolver r = new Resolver(config, workflow, b);
+
+        int minCount = r.integer("challenge.min.count", true, DEFAULT_CHALLENGE_MIN_COUNT, 1, MAX_CHALLENGES);
+        int maxCount = r.integer("challenge.max.count", false, DEFAULT_CHALLENGE_MAX_COUNT, 1, MAX_CHALLENGES);
+        if (minCount > maxCount) {
+            b.warning("challenge.min.count (" + minCount + ") is above challenge.max.count (" + maxCount
+                    + "); using defaults " + DEFAULT_CHALLENGE_MIN_COUNT + " and " + DEFAULT_CHALLENGE_MAX_COUNT);
+            minCount = DEFAULT_CHALLENGE_MIN_COUNT;
+            maxCount = DEFAULT_CHALLENGE_MAX_COUNT;
+        }
+
         return b
                 .enabled(r.bool("enabled", false, DEFAULT_ENABLED))
                 .mode(r.enumValue("mode", true, LivenessMode.class, DEFAULT_MODE))
-                .passiveThreshold(r.decimal("passive.threshold", true, DEFAULT_PASSIVE_THRESHOLD))
-                .passiveMinFrames(r.integer("passive.min.frames", false, DEFAULT_PASSIVE_MIN_FRAMES))
+                .passiveThreshold(r.decimal("passive.threshold", true, DEFAULT_PASSIVE_THRESHOLD, 0.0, 1.0))
+                .passiveMinFrames(r.integer("passive.min.frames", false, DEFAULT_PASSIVE_MIN_FRAMES, 3, 60))
                 .activeEnabled(r.bool("active.enabled", true, DEFAULT_ACTIVE_ENABLED))
-                .challengePool(DEFAULT_CHALLENGE_POOL)
-                .challengeMinCount(r.integer("challenge.min.count", true, DEFAULT_CHALLENGE_MIN_COUNT))
-                .challengeMaxCount(r.integer("challenge.max.count", false, DEFAULT_CHALLENGE_MAX_COUNT))
-                .challengeTimeoutMs(r.integer("challenge.timeout.ms", true, DEFAULT_CHALLENGE_TIMEOUT_MS))
-                .sessionTimeoutMs(r.integer("session.timeout.ms", false, DEFAULT_SESSION_TIMEOUT_MS))
-                .blinkMinFps(r.decimal("blink.min.fps", false, DEFAULT_BLINK_MIN_FPS))
-                .maxRetries(r.integer("max.retries", true, DEFAULT_MAX_RETRIES))
+                .challengePool(r.challengeList("challenge.pool", true, DEFAULT_CHALLENGE_POOL))
+                .challengeMinCount(minCount)
+                .challengeMaxCount(maxCount)
+                .challengeTimeoutMs(r.integer("challenge.timeout.ms", true, DEFAULT_CHALLENGE_TIMEOUT_MS, 2000L, 15000L))
+                .sessionTimeoutMs(r.integer("session.timeout.ms", false, DEFAULT_SESSION_TIMEOUT_MS, 10000L, 120000L))
+                .blinkMinFps(r.decimal("blink.min.fps", false, DEFAULT_BLINK_MIN_FPS, 1.0, 120.0))
+                .maxRetries(r.integer("max.retries", true, DEFAULT_MAX_RETRIES, 1, 10))
                 .onMaxRetries(r.enumValue("on.max.retries", true, MaxRetriesAction.class, DEFAULT_ON_MAX_RETRIES))
                 .bindCaptureEnabled(r.bool("bind.capture.enabled", false, DEFAULT_BIND_CAPTURE_ENABLED))
-                .bindMinSimilarity(r.decimal("bind.min.similarity", false, DEFAULT_BIND_MIN_SIMILARITY))
+                .bindMinSimilarity(r.decimal("bind.min.similarity", false, DEFAULT_BIND_MIN_SIMILARITY, 0.0, 1.0))
                 .build();
     }
 
@@ -117,39 +130,59 @@ public final class LivenessConfigLoader {
             return invalid(key, defaultValue);
         }
 
-        double decimal(String setting, boolean perWorkflow, double defaultValue) {
+        double decimal(String setting, boolean perWorkflow, double defaultValue, double min, double max) {
             String key = keyFor(setting, perWorkflow);
             if (key == null) {
                 return defaultValue;
             }
             try {
-                return Double.parseDouble(value(key));
+                double parsed = Double.parseDouble(value(key));
+                return parsed >= min && parsed <= max ? parsed : invalid(key, defaultValue);
             } catch (NumberFormatException e) {
                 return invalid(key, defaultValue);
             }
         }
 
-        int integer(String setting, boolean perWorkflow, int defaultValue) {
+        int integer(String setting, boolean perWorkflow, int defaultValue, int min, int max) {
+            return (int) integer(setting, perWorkflow, (long) defaultValue, (long) min, (long) max);
+        }
+
+        long integer(String setting, boolean perWorkflow, long defaultValue, long min, long max) {
             String key = keyFor(setting, perWorkflow);
             if (key == null) {
                 return defaultValue;
             }
             try {
-                return Integer.parseInt(value(key));
+                long parsed = Long.parseLong(value(key));
+                return parsed >= min && parsed <= max ? parsed : invalid(key, defaultValue);
             } catch (NumberFormatException e) {
                 return invalid(key, defaultValue);
             }
         }
 
-        long integer(String setting, boolean perWorkflow, long defaultValue) {
+        List<ChallengeType> challengeList(String setting, boolean perWorkflow, List<ChallengeType> defaultValue) {
             String key = keyFor(setting, perWorkflow);
             if (key == null) {
                 return defaultValue;
             }
+            List<ChallengeType> pool = new ArrayList<ChallengeType>();
+            for (String name : value(key).split(",", -1)) {
+                ChallengeType type = selectableChallenge(name.trim());
+                if (type == null) {
+                    return invalid(key, defaultValue);
+                }
+                pool.add(type);
+            }
+            return pool;
+        }
+
+        /** @return the challenge named, or {@code null} if unknown or not selectable (NEUTRAL_HOLD is always added) */
+        private ChallengeType selectableChallenge(String name) {
             try {
-                return Long.parseLong(value(key));
-            } catch (NumberFormatException e) {
-                return invalid(key, defaultValue);
+                ChallengeType type = ChallengeType.valueOf(name.toUpperCase(Locale.ROOT));
+                return type == ChallengeType.NEUTRAL_HOLD ? null : type;
+            } catch (IllegalArgumentException e) {
+                return null;
             }
         }
 
