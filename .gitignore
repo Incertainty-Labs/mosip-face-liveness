@@ -1,0 +1,19 @@
+# Official MOSIP PDFs: link to them, don't redistribute
+docs/source/
+
+# Editor / local tool state
+docs/.obsidian/
+.idea/
+.vscode/
+*.iml
+
+# Commit message drafts
+.commit-msg.txt
+# Build output
+target/
+build/
+.gradle/
+
+# Test data and evaluation output (clips stay on Drive, never in git)
+testdata/clips/
+results/
