@@ -15,6 +15,11 @@
     <description>1:1 face verification (YuNet alignment + SFace embedding) shared by the Desktop BioSDK plug-in and the Android client. Pure Java, Android API 28 compatible.</description>
 
     <dependencies>
+        <!-- Shared frame type (FaceFrame) and error codes. -->
+        <dependency>
+            <groupId>io.mosip.registration.liveness</groupId>
+            <artifactId>liveness-core</artifactId>
+        </dependency>
         <!-- Supplied by the host: onnxruntime on Desktop, onnxruntime-android on Android. -->
         <dependency>
             <groupId>com.microsoft.onnxruntime</groupId>

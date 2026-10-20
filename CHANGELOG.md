@@ -4,8 +4,12 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-20
+
 ### Added
 
+- `face-verification` contract, reviewed with Person B: `FaceVerifier` (single reference, and a list of references with the probe analysed once), `VerificationResult` (MATCH, NO_MATCH, NO_FACE_PROBE, MULTIPLE_FACES_PROBE, REFERENCE_UNUSABLE; similarity clamped from cosine to 0..1; threshold; model version), `FaceVerificationConfig` (threshold 0.363 by default, warnings for invalid values) and `FaceVerifiers.stub(config)`. The real SFace verifier follows (A-25a).
+- `bind.min.similarity` now applies to the Desktop geometric binder only; the Android match binder uses the face verification threshold.
 - `CaptureFreshness`: on every capture, checks that the device-signed `transactionId` echoes the session nonce and that the signed timestamp is within `bind.freshness.max.age.ms` (default 60000) of the reference time; fails with LIV-014. `newNonce()` makes a valid SBI `transactionId` when liveness is off. Agreed with Person B 20 Oct.
 - `LivenessResult.nonce()`: each session's random nonce, to send as the capture request's `transactionId`.
 - `LivenessPolicy.bindFreshnessMaxAgeMs()` and the `mosip.registration.face.liveness.bind.freshness.max.age.ms` key (1000..300000).
