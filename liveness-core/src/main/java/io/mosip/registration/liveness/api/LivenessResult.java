@@ -29,6 +29,7 @@ public final class LivenessResult {
     private final String engineVersion;
     private final Map<String, String> modelVersions;
     private final String evidenceDigest;
+    private final String nonce;
 
     private LivenessResult(Builder b) {
         this.decision = b.decision;
@@ -44,6 +45,7 @@ public final class LivenessResult {
         this.engineVersion = b.engineVersion;
         this.modelVersions = Collections.unmodifiableMap(new LinkedHashMap<String, String>(b.modelVersions));
         this.evidenceDigest = b.evidenceDigest;
+        this.nonce = b.nonce;
     }
 
     /**
@@ -123,6 +125,14 @@ public final class LivenessResult {
         return evidenceDigest;
     }
 
+    /**
+     * @return the session's random nonce, 32 lowercase hex characters. Send it as the capture request's SBI
+     *         {@code transactionId} and check the signed echo with {@code CaptureFreshness}
+     */
+    public String nonce() {
+        return nonce;
+    }
+
     /** @return compact list for audit and packet, for example {@code TURN_LEFT:PASSED,NEUTRAL_HOLD:PASSED} */
     public String challengeSummary() {
         StringBuilder sb = new StringBuilder();
@@ -150,6 +160,7 @@ public final class LivenessResult {
         private String engineVersion = "";
         private Map<String, String> modelVersions = Collections.emptyMap();
         private String evidenceDigest;
+        private String nonce;
 
         private Builder(SessionState finalState, Decision decision) {
             if (finalState == null || !finalState.isFinal() || decision == null) {
@@ -212,6 +223,12 @@ public final class LivenessResult {
         /** @param value hex SHA-256 evidence digest, or null @return this builder */
         public Builder evidenceDigest(String value) {
             this.evidenceDigest = value;
+            return this;
+        }
+
+        /** @param value the session nonce @return this builder */
+        public Builder nonce(String value) {
+            this.nonce = value;
             return this;
         }
 

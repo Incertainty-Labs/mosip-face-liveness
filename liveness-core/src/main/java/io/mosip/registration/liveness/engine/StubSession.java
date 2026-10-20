@@ -18,12 +18,13 @@ import io.mosip.registration.liveness.api.PromptLevel;
 import io.mosip.registration.liveness.api.Rect;
 import io.mosip.registration.liveness.api.SessionState;
 import io.mosip.registration.liveness.api.UserPrompt;
+import io.mosip.registration.liveness.binding.CaptureFreshness;
+import java.security.SecureRandom;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
-import java.util.Random;
 
 /**
  * One scripted session. The timeline is the frames' own timestamps, measured from the first frame, so the stub
@@ -53,6 +54,7 @@ final class StubSession implements LivenessSession {
     private final Deque<AnalysedFrame> recent = new ArrayDeque<AnalysedFrame>(RECENT_FRAMES);
     private final int challengeCount;
     private final double passiveScore;
+    private final String nonce;
 
     private SessionState state = SessionState.WAITING_FOR_FACE;
     private long firstFrameMs = -1L;
@@ -62,8 +64,9 @@ final class StubSession implements LivenessSession {
     private long stepStartMs;
     private boolean finished;
 
-    StubSession(StubScenario scenario, LivenessPolicy policy, LivenessCallback callback, Random random) {
+    StubSession(StubScenario scenario, LivenessPolicy policy, LivenessCallback callback, SecureRandom random) {
         this.scenario = scenario;
+        this.nonce = CaptureFreshness.newNonce(random);
         this.callback = callback;
         this.challengeCount = scenario.escalates() ? policy.challengeMinCount() : 0;
         this.passiveScore = scenario == StubScenario.PAD ? ATTACK_PASSIVE_SCORE
@@ -133,7 +136,7 @@ final class StubSession implements LivenessSession {
         recent.addLast(new AnalysedFrame(frame, observation));
     }
 
-    private void buildSchedule(LivenessPolicy policy, Random random) {
+    private void buildSchedule(LivenessPolicy policy, SecureRandom random) {
         if (scenario == StubScenario.NO_FACE) {
             schedule.add(new Step(SessionState.WAITING_FOR_FACE,
                     new UserPrompt("liveness.guidance.face_not_found", PromptLevel.GUIDANCE), null,
@@ -220,12 +223,13 @@ final class StubSession implements LivenessSession {
                 .frames(frames, duration > 0 ? frames * 1000.0 / duration : 0.0)
                 .durationMs(duration)
                 .errorCode(error)
+                .nonce(nonce)
                 .versions(StubLivenessEngine.VERSION, Collections.<String, String>emptyMap())
                 .build();
     }
 
     /** Picks a random challenge from the pool, never the same type twice in a row. */
-    private static ChallengeType pick(List<ChallengeType> pool, ChallengeType previous, Random random) {
+    private static ChallengeType pick(List<ChallengeType> pool, ChallengeType previous, SecureRandom random) {
         List<ChallengeType> candidates = new ArrayList<ChallengeType>(pool);
         if (candidates.size() > 1) {
             candidates.remove(previous);

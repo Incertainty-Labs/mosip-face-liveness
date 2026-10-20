@@ -196,6 +196,20 @@ class StubLivenessEngineTest {
                 () -> assertTrue(session.recentFrames().isEmpty()));
     }
 
+    @Test
+    @DisplayName("Each session has its own nonce (32 hex characters) for the capture request's transactionId")
+    void eachSessionHasItsOwnNonce() {
+        LivenessEngine engine = engine(Collections.<String, String>emptyMap());
+        LivenessPolicy policy = policy(Collections.<String, String>emptyMap());
+
+        String first = run(engine, policy, new RecordingCallback()).nonce();
+        String second = run(engine, policy, new RecordingCallback()).nonce();
+
+        assertAll(
+                () -> assertTrue(first.matches("[0-9a-f]{32}"), first),
+                () -> assertTrue(!first.equals(second)));
+    }
+
     // ---- helpers -------------------------------------------------------------------------------------------
 
     private static LivenessEngine engine(Map<String, String> config) {

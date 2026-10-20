@@ -50,6 +50,7 @@ class LivenessConfigLoaderTest {
                 () -> assertEquals(MaxRetriesAction.BLOCK, policy.onMaxRetries()),
                 () -> assertTrue(policy.bindCaptureEnabled()),
                 () -> assertEquals(0.60, policy.bindMinSimilarity(), 1e-9),
+                () -> assertEquals(60000L, policy.bindFreshnessMaxAgeMs()),
                 () -> assertEquals(Collections.emptyList(), policy.warnings()));
     }
 
@@ -98,7 +99,9 @@ class LivenessConfigLoaderTest {
                 Arguments.of("blink.min.fps", "0", 15.0, (Function<LivenessPolicy, Number>) LivenessPolicy::blinkMinFps),
                 Arguments.of("max.retries", "0", 3, (Function<LivenessPolicy, Number>) LivenessPolicy::maxRetries),
                 Arguments.of("max.retries", "11", 3, (Function<LivenessPolicy, Number>) LivenessPolicy::maxRetries),
-                Arguments.of("bind.min.similarity", "1.01", 0.60, (Function<LivenessPolicy, Number>) LivenessPolicy::bindMinSimilarity));
+                Arguments.of("bind.min.similarity", "1.01", 0.60, (Function<LivenessPolicy, Number>) LivenessPolicy::bindMinSimilarity),
+                Arguments.of("bind.freshness.max.age.ms", "999", 60000L, (Function<LivenessPolicy, Number>) LivenessPolicy::bindFreshnessMaxAgeMs),
+                Arguments.of("bind.freshness.max.age.ms", "300001", 60000L, (Function<LivenessPolicy, Number>) LivenessPolicy::bindFreshnessMaxAgeMs));
     }
 
     @ParameterizedTest(name = "{0}={1} falls back to {2}")

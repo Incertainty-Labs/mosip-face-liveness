@@ -26,6 +26,7 @@ public final class LivenessPolicy {
     private final MaxRetriesAction onMaxRetries;
     private final boolean bindCaptureEnabled;
     private final double bindMinSimilarity;
+    private final long bindFreshnessMaxAgeMs;
     private final List<String> warnings;
 
     private LivenessPolicy(Builder b) {
@@ -45,6 +46,7 @@ public final class LivenessPolicy {
         this.onMaxRetries = b.onMaxRetries;
         this.bindCaptureEnabled = b.bindCaptureEnabled;
         this.bindMinSimilarity = b.bindMinSimilarity;
+        this.bindFreshnessMaxAgeMs = b.bindFreshnessMaxAgeMs;
         this.warnings = Collections.unmodifiableList(new ArrayList<String>(b.warnings));
     }
 
@@ -138,6 +140,14 @@ public final class LivenessPolicy {
         return bindMinSimilarity;
     }
 
+    /**
+     * @return allowed distance, in milliseconds, between the device-signed capture timestamp and the reference time
+     *         (liveness PASSED, or request sent when liveness is off); see {@code CaptureFreshness}
+     */
+    public long bindFreshnessMaxAgeMs() {
+        return bindFreshnessMaxAgeMs;
+    }
+
     /** @return problems found while building the policy, such as invalid values replaced by defaults; unmodifiable */
     public List<String> warnings() {
         return warnings;
@@ -161,6 +171,7 @@ public final class LivenessPolicy {
         private MaxRetriesAction onMaxRetries;
         private boolean bindCaptureEnabled;
         private double bindMinSimilarity;
+        private long bindFreshnessMaxAgeMs;
         private final List<String> warnings = new ArrayList<String>();
 
         private Builder(Workflow workflow) {
@@ -257,6 +268,12 @@ public final class LivenessPolicy {
         /** @param value see {@link LivenessPolicy#bindMinSimilarity()} @return this builder */
         public Builder bindMinSimilarity(double value) {
             this.bindMinSimilarity = value;
+            return this;
+        }
+
+        /** @param value see {@link LivenessPolicy#bindFreshnessMaxAgeMs()} @return this builder */
+        public Builder bindFreshnessMaxAgeMs(long value) {
+            this.bindFreshnessMaxAgeMs = value;
             return this;
         }
 

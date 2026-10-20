@@ -57,6 +57,8 @@ public final class LivenessConfigLoader {
     public static final boolean DEFAULT_BIND_CAPTURE_ENABLED = true;
     /** Default for {@code bind.min.similarity}. */
     public static final double DEFAULT_BIND_MIN_SIMILARITY = 0.60;
+    /** Default for {@code bind.freshness.max.age.ms}. */
+    public static final long DEFAULT_BIND_FRESHNESS_MAX_AGE_MS = 60000L;
     /** Upper bound for {@code challenge.min.count} and {@code challenge.max.count}. */
     public static final int MAX_CHALLENGES = 5;
 
@@ -100,6 +102,8 @@ public final class LivenessConfigLoader {
                 .onMaxRetries(r.enumValue("on.max.retries", true, MaxRetriesAction.class, DEFAULT_ON_MAX_RETRIES))
                 .bindCaptureEnabled(r.bool("bind.capture.enabled", false, DEFAULT_BIND_CAPTURE_ENABLED))
                 .bindMinSimilarity(r.decimal("bind.min.similarity", false, DEFAULT_BIND_MIN_SIMILARITY, 0.0, 1.0))
+                .bindFreshnessMaxAgeMs(r.integer("bind.freshness.max.age.ms", false,
+                        DEFAULT_BIND_FRESHNESS_MAX_AGE_MS, 1000L, 300000L))
                 .build();
     }
 
