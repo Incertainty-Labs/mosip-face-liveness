@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.mosip.registration.liveness.api.AnalysedFrame;
 import io.mosip.registration.liveness.api.ChallengeType;
 import io.mosip.registration.liveness.api.Decision;
 import io.mosip.registration.liveness.api.FaceFrame;
@@ -20,7 +21,9 @@ import io.mosip.registration.liveness.api.LivenessSession;
 import io.mosip.registration.liveness.api.SessionState;
 import io.mosip.registration.liveness.api.Workflow;
 import io.mosip.registration.liveness.config.LivenessConfigLoader;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -120,6 +123,79 @@ class StubLivenessEngineTest {
                         p -> p.key().equals("liveness.guidance.face_not_found") && p.level() == PromptLevel.GUIDANCE)));
     }
 
+    @Test
+    @DisplayName("cancel() ends the session as CANCELLED once; later cancels and frames change nothing")
+    void cancelReportsOnceAndIgnoresLaterFrames() {
+        RecordingCallback callback = new RecordingCallback();
+        LivenessSession session = engine(Collections.<String, String>emptyMap())
+                .startSession(context(), policy(Collections.<String, String>emptyMap()), callback);
+        feed(session, 0L, 300L);
+
+        session.cancel();
+        session.cancel();
+        int statesAfterCancel = callback.distinctStates().size();
+        feed(session, 400L, 9000L);
+
+        LivenessResult result = callback.result();
+        assertAll(
+                () -> assertEquals(1, callback.resultCount()),
+                () -> assertEquals(SessionState.CANCELLED, result.finalState()),
+                () -> assertEquals(Decision.INCONCLUSIVE, result.decision()),
+                () -> assertNull(result.errorCode()),
+                () -> assertEquals(SessionState.CANCELLED, session.state()),
+                () -> assertEquals(statesAfterCancel, callback.distinctStates().size()));
+    }
+
+    @Test
+    @DisplayName("Frames after the result are ignored")
+    void framesAfterResultAreIgnored() {
+        RecordingCallback callback = new RecordingCallback();
+        LivenessSession session = engine(force("PASS_PASSIVE"))
+                .startSession(context(), policy(Collections.<String, String>emptyMap()), callback);
+        feed(session, 0L, 2000L);
+        int states = callback.distinctStates().size();
+
+        feed(session, 2100L, 6000L);
+        session.cancel();
+
+        assertAll(
+                () -> assertEquals(1, callback.resultCount()),
+                () -> assertEquals(SessionState.PASSED, callback.result().finalState()),
+                () -> assertEquals(states, callback.distinctStates().size()));
+    }
+
+    @Test
+    @DisplayName("An unknown stub.force value plays the default PASS_ACTIVE scenario")
+    void unknownScenarioFallsBackToDefault() {
+        RecordingCallback callback = new RecordingCallback();
+
+        LivenessResult result = run(engine(force("EXPLODE")), policy(Collections.<String, String>emptyMap()), callback);
+
+        assertAll(
+                () -> assertEquals(Decision.LIVE, result.decision()),
+                () -> assertTrue(result.activeUsed()));
+    }
+
+    @Test
+    @DisplayName("recentFrames() keeps the last five frames in order, past the result, until clear()")
+    void recentFramesKeepsLastFiveUntilCleared() {
+        RecordingCallback callback = new RecordingCallback();
+        LivenessSession session = engine(force("PASS_PASSIVE"))
+                .startSession(context(), policy(Collections.<String, String>emptyMap()), callback);
+        feed(session, 0L, 2000L);
+
+        List<Long> sequences = new ArrayList<Long>();
+        for (AnalysedFrame f : session.recentFrames()) {
+            sequences.add(f.frame().sequence());
+        }
+        session.clear();
+
+        assertAll(
+                () -> assertEquals(Decision.LIVE, callback.result().decision()),
+                () -> assertEquals(Arrays.asList(16L, 17L, 18L, 19L, 20L), sequences),
+                () -> assertTrue(session.recentFrames().isEmpty()));
+    }
+
     // ---- helpers -------------------------------------------------------------------------------------------
 
     private static LivenessEngine engine(Map<String, String> config) {
@@ -143,6 +219,13 @@ class StubLivenessEngineTest {
         }
         assertNotNull(callback.result(), "session never produced a result");
         return callback.result();
+    }
+
+    /** Feeds frames every 100 ms with timestamps from {@code fromMs} to {@code toMs} inclusive. */
+    private static void feed(LivenessSession session, long fromMs, long toMs) {
+        for (long t = fromMs; t <= toMs; t += FRAME_INTERVAL_MS) {
+            session.onFrame(new FaceFrame(2, 2, new byte[12], t, t / FRAME_INTERVAL_MS, "test:frames"));
+        }
     }
 
     static Map<String, String> force(String scenario) {

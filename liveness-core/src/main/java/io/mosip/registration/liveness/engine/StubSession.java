@@ -8,16 +8,20 @@ import io.mosip.registration.liveness.api.ChallengeType;
 import io.mosip.registration.liveness.api.Decision;
 import io.mosip.registration.liveness.api.ErrorCategory;
 import io.mosip.registration.liveness.api.FaceFrame;
+import io.mosip.registration.liveness.api.FaceObservation;
 import io.mosip.registration.liveness.api.LivenessCallback;
 import io.mosip.registration.liveness.api.LivenessErrorCode;
 import io.mosip.registration.liveness.api.LivenessPolicy;
 import io.mosip.registration.liveness.api.LivenessResult;
 import io.mosip.registration.liveness.api.LivenessSession;
 import io.mosip.registration.liveness.api.PromptLevel;
+import io.mosip.registration.liveness.api.Rect;
 import io.mosip.registration.liveness.api.SessionState;
 import io.mosip.registration.liveness.api.UserPrompt;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.Random;
 
@@ -39,16 +43,20 @@ final class StubSession implements LivenessSession {
     static final double HIGH_PASSIVE_SCORE = 0.95;
     /** Scripted passive score for a presentation attack. */
     static final double ATTACK_PASSIVE_SCORE = 0.20;
+    /** Frames kept for the capture binder (API.md §3.5). */
+    static final int RECENT_FRAMES = 5;
 
     private final StubScenario scenario;
     private final LivenessCallback callback;
     private final List<Step> schedule = new ArrayList<Step>();
     private final List<ChallengeOutcome> outcomes = new ArrayList<ChallengeOutcome>();
+    private final Deque<AnalysedFrame> recent = new ArrayDeque<AnalysedFrame>(RECENT_FRAMES);
     private final int challengeCount;
     private final double passiveScore;
 
     private SessionState state = SessionState.WAITING_FOR_FACE;
     private long firstFrameMs = -1L;
+    private long lastFrameMs = -1L;
     private int frames;
     private int stepIndex = -1;
     private long stepStartMs;
@@ -70,7 +78,9 @@ final class StubSession implements LivenessSession {
             return;
         }
         frames++;
+        remember(frame);
         long now = frame.timestampMs();
+        lastFrameMs = now;
         if (firstFrameMs < 0) {
             firstFrameMs = now;
             if (scenario == StubScenario.ENGINE_ERROR) {
@@ -89,7 +99,13 @@ final class StubSession implements LivenessSession {
 
     @Override
     public synchronized void cancel() {
-        // implemented in a later step
+        if (finished) {
+            return;
+        }
+        finished = true;
+        state = SessionState.CANCELLED;
+        callback.onResult(result(SessionState.CANCELLED, Decision.INCONCLUSIVE, null,
+                firstFrameMs < 0 ? 0L : lastFrameMs));
     }
 
     @Override
@@ -99,12 +115,22 @@ final class StubSession implements LivenessSession {
 
     @Override
     public synchronized List<AnalysedFrame> recentFrames() {
-        return Collections.emptyList();
+        return Collections.unmodifiableList(new ArrayList<AnalysedFrame>(recent));
     }
 
     @Override
     public synchronized void clear() {
-        // nothing buffered yet
+        recent.clear();
+    }
+
+    /** Keeps the frame with a stub observation (one face filling the frame); the stub analyses no pixels. */
+    private void remember(FaceFrame frame) {
+        if (recent.size() == RECENT_FRAMES) {
+            recent.removeFirst();
+        }
+        FaceObservation observation = FaceObservation.builder()
+                .faces(1, new Rect(0, 0, frame.width(), frame.height())).build();
+        recent.addLast(new AnalysedFrame(frame, observation));
     }
 
     private void buildSchedule(LivenessPolicy policy, Random random) {
@@ -186,7 +212,7 @@ final class StubSession implements LivenessSession {
     }
 
     private LivenessResult result(SessionState finalState, Decision decision, LivenessErrorCode error, long endMs) {
-        long duration = endMs - firstFrameMs;
+        long duration = firstFrameMs < 0 ? 0L : endMs - firstFrameMs;
         return LivenessResult.builder(finalState, decision)
                 .passiveScore(passiveScore)
                 .activeUsed(challengeCount > 0)

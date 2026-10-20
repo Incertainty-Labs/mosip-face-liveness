@@ -4,7 +4,7 @@ Hybrid passive and active face liveness and presentation attack detection (PAD) 
 
 Built for MOSIP Decode 2026, Problem Statement 04, by team Incertainty.
 
-> **Status:** project scaffold. Modules build and test; engine code lands from `v0.1.0`.
+> **Status:** `v0.1.0`: frozen interface contract and a scripted stub engine for client integration. The real engine (`HybridLivenessEngine`) lands in `v0.2.0`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Modules
 

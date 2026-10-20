@@ -35,11 +35,16 @@ enum StubScenario {
     /** Config key that selects the scenario. */
     static final String KEY = LivenessConfigLoader.PREFIX + "stub.force";
 
+    /** @return the scenario named in the config, or {@link #PASS_ACTIVE} when missing or unknown */
     static StubScenario from(Map<String, String> config) {
         String value = config.get(KEY);
-        if (value == null || value.trim().isEmpty()) {
+        if (value == null) {
             return PASS_ACTIVE;
         }
-        return valueOf(value.trim().toUpperCase(Locale.ROOT));
+        try {
+            return valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return PASS_ACTIVE;
+        }
     }
 }
