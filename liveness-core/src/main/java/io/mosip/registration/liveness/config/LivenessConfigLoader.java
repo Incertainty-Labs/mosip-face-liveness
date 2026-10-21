@@ -25,8 +25,8 @@ public final class LivenessConfigLoader {
     /** Prefix shared by every liveness configuration key. */
     public static final String PREFIX = "mosip.registration.face.liveness.";
 
-    /** Default for {@code enabled}. */
-    public static final boolean DEFAULT_ENABLED = true;
+    /** Default for {@code enabled}: off, so a client without liveness config behaves exactly as before (MOSIP, 21 Oct). */
+    public static final boolean DEFAULT_ENABLED = false;
     /** Default for {@code mode}. */
     public static final LivenessMode DEFAULT_MODE = LivenessMode.HYBRID;
     /** Default for {@code passive.threshold}. */

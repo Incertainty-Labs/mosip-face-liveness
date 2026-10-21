@@ -2,6 +2,7 @@ package io.mosip.registration.liveness.config;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.mosip.registration.liveness.api.ChallengeType;
@@ -33,7 +34,7 @@ class LivenessConfigLoaderTest {
 
         assertAll(
                 () -> assertEquals(Workflow.RESIDENT_REGISTRATION, policy.workflow()),
-                () -> assertTrue(policy.enabled()),
+                () -> assertFalse(policy.enabled()),
                 () -> assertEquals(LivenessMode.HYBRID, policy.mode()),
                 () -> assertEquals(0.80, policy.passiveThreshold(), 1e-9),
                 () -> assertEquals(8, policy.passiveMinFrames()),
@@ -177,9 +178,20 @@ class LivenessConfigLoaderTest {
         assertAll(
                 () -> assertEquals(LivenessMode.HYBRID, policy.mode()),
                 () -> assertEquals(MaxRetriesAction.BLOCK, policy.onMaxRetries()),
-                () -> assertTrue(policy.enabled()),
+                () -> assertFalse(policy.enabled()),
                 () -> assertTrue(policy.activeEnabled()),
                 () -> assertEquals(1, policy.warnings().size()));
+    }
+
+    @Test
+    @DisplayName("enabled=true turns liveness on for every workflow")
+    void enabledTrueTurnsLivenessOnEverywhere() {
+        Map<String, String> config = new HashMap<String, String>();
+        config.put("mosip.registration.face.liveness.enabled", "true");
+
+        for (Workflow workflow : Workflow.values()) {
+            assertTrue(LivenessConfigLoader.load(config, workflow).enabled(), workflow.name());
+        }
     }
 
     @Test

@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+### Changed
+
+- `mosip.registration.face.liveness.enabled` now defaults to `false`, so a client without liveness config behaves exactly as before. MOSIP asked for new keys to default to the current behaviour (21 Oct). Configs that want liveness must set `enabled=true`.
+
 ## [0.1.2] - 2026-10-20
 
 Same code as 0.1.1, which did not publish on JitPack.
