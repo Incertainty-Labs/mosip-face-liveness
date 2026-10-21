@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- `PacketEvidence.of(result, policy)`: builds the API.md §9 keys for the face BIR's `others` map, so both clients write identical packet evidence. Adds `LIVENESS_THRESHOLD` (the passive threshold the session applied), as MOSIP asked for thresholds in the packet (21 Oct). Decimals always use a dot; the digest key is left out when the engine made no digest.
+
 ### Changed
 
 - `mosip.registration.face.liveness.enabled` now defaults to `false`, so a client without liveness config behaves exactly as before. MOSIP asked for new keys to default to the current behaviour (21 Oct). Configs that want liveness must set `enabled=true`.
