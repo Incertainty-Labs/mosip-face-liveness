@@ -8,6 +8,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 - `liveness-desktop`: `JpegFrames.decode` turns one JPEG of an SBI live stream into an RGB `FaceFrame` (API.md §4.2), and an MJPEG part reader reads `multipart/x-mixed-replace` streams by `Content-Length`, or up to the JPEG end marker when a device leaves that header out. Checked against MockMDS's exact framing.
 - `liveness-desktop`: `MjpegFrameSource` reads an SBI 0.9.5 face live stream straight from the device service (for the Liveness Workbench): LIV-001 when no stream can be opened, LIV-012 for an unreadable frame, one reconnect on a drop and then LIV-002, and the measured frame rate over 2 s in `capabilities()`.
+- A `BytecodeLevelTest` in every module fails the build when a compiled class is not at the module's release level (Java 8 for `liveness-core` and `face-verification`, Java 11 for `liveness-desktop` and `liveness-eval`), so a newer class left in `target/classes` by an editor cannot reach a jar.
 
 ## [0.1.3] - 2026-10-21
 
