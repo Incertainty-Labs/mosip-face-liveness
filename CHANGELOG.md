@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-21
+
+Follows MOSIP's answers of 21 Oct: new keys default to the feature off, thresholds go in the packet, and changes target the clients' `master` branches.
+
 ### Added
 
 - `PacketEvidence.of(result, policy)`: builds the API.md §9 keys for the face BIR's `others` map, so both clients write identical packet evidence. Adds `LIVENESS_THRESHOLD` (the passive threshold the session applied), as MOSIP asked for thresholds in the packet (21 Oct). Decimals always use a dot; the digest key is left out when the engine made no digest.
