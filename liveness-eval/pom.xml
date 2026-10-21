@@ -15,7 +15,8 @@
     <description>Evaluation harness: replays labelled clips through the engine and reports ISO/IEC 30107-3 metrics.</description>
 
     <properties>
-        <maven.compiler.release>21</maven.compiler.release>
+        <!-- The Desktop Registration Client on master runs on a Zulu 11 FX JRE (MOSIP: base changes on master). -->
+        <maven.compiler.release>11</maven.compiler.release>
     </properties>
 
     <dependencies>

@@ -10,6 +10,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Changed
 
+- `liveness-desktop` and `liveness-eval` now compile with `--release 11`, because the Desktop Registration Client on `master` runs on a Zulu 11 FX JRE (MOSIP asked us to base changes on `master`, 21 Oct). CI builds and tests on JDK 11 and 21.
 - `mosip.registration.face.liveness.enabled` now defaults to `false`, so a client without liveness config behaves exactly as before. MOSIP asked for new keys to default to the current behaviour (21 Oct). Configs that want liveness must set `enabled=true`.
 
 ## [0.1.2] - 2026-10-20
