@@ -7,6 +7,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 ### Added
 
 - `liveness-desktop`: `JpegFrames.decode` turns one JPEG of an SBI live stream into an RGB `FaceFrame` (API.md §4.2), and an MJPEG part reader reads `multipart/x-mixed-replace` streams by `Content-Length`, or up to the JPEG end marker when a device leaves that header out. Checked against MockMDS's exact framing.
+- `liveness-desktop`: `MjpegFrameSource` reads an SBI 0.9.5 face live stream straight from the device service (for the Liveness Workbench): LIV-001 when no stream can be opened, LIV-012 for an unreadable frame, one reconnect on a drop and then LIV-002, and the measured frame rate over 2 s in `capabilities()`.
 
 ## [0.1.3] - 2026-10-21
 
