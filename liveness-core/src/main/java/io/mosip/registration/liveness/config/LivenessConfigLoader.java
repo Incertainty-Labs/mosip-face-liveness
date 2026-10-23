@@ -61,6 +61,16 @@ public final class LivenessConfigLoader {
     public static final long DEFAULT_BIND_FRESHNESS_MAX_AGE_MS = 60000L;
     /** Default for {@code detector.min.score}: OpenCV's FaceDetectorYN default. */
     public static final double DEFAULT_DETECTOR_MIN_SCORE = 0.90;
+    /** Default for {@code quality.min.face.width}: a quarter of the frame width (TECHNICAL_DESIGN quality checks). */
+    public static final double DEFAULT_QUALITY_MIN_FACE_WIDTH = 0.25;
+    /** Default for {@code quality.max.centre.offset}: centre within the middle half of the frame. */
+    public static final double DEFAULT_QUALITY_MAX_CENTRE_OFFSET = 0.25;
+    /** Default for {@code quality.min.sharpness}: sharp faces measure 0.6 to 0.9, blurred ones 0.1 to 0.3. */
+    public static final double DEFAULT_QUALITY_MIN_SHARPNESS = 0.40;
+    /** Default for {@code quality.min.brightness}: mean luma 60 of 255. */
+    public static final double DEFAULT_QUALITY_MIN_BRIGHTNESS = 0.235;
+    /** Default for {@code quality.max.brightness}: mean luma 200 of 255. */
+    public static final double DEFAULT_QUALITY_MAX_BRIGHTNESS = 0.784;
     /** Upper bound for {@code challenge.min.count} and {@code challenge.max.count}. */
     public static final int MAX_CHALLENGES = 5;
 
@@ -88,6 +98,15 @@ public final class LivenessConfigLoader {
             maxCount = DEFAULT_CHALLENGE_MAX_COUNT;
         }
 
+        double minBrightness = r.decimal("quality.min.brightness", false, DEFAULT_QUALITY_MIN_BRIGHTNESS, 0.0, 1.0);
+        double maxBrightness = r.decimal("quality.max.brightness", false, DEFAULT_QUALITY_MAX_BRIGHTNESS, 0.0, 1.0);
+        if (minBrightness >= maxBrightness) {
+            b.warning("quality.min.brightness (" + minBrightness + ") is not below quality.max.brightness (" + maxBrightness
+                    + "); using defaults " + DEFAULT_QUALITY_MIN_BRIGHTNESS + " and " + DEFAULT_QUALITY_MAX_BRIGHTNESS);
+            minBrightness = DEFAULT_QUALITY_MIN_BRIGHTNESS;
+            maxBrightness = DEFAULT_QUALITY_MAX_BRIGHTNESS;
+        }
+
         return b
                 .enabled(r.bool("enabled", false, DEFAULT_ENABLED))
                 .mode(r.enumValue("mode", true, LivenessMode.class, DEFAULT_MODE))
@@ -107,6 +126,12 @@ public final class LivenessConfigLoader {
                 .bindFreshnessMaxAgeMs(r.integer("bind.freshness.max.age.ms", false,
                         DEFAULT_BIND_FRESHNESS_MAX_AGE_MS, 1000L, 300000L))
                 .detectorMinScore(r.decimal("detector.min.score", false, DEFAULT_DETECTOR_MIN_SCORE, 0.5, 0.99))
+                .qualityMinFaceWidth(r.decimal("quality.min.face.width", false, DEFAULT_QUALITY_MIN_FACE_WIDTH, 0.05, 0.9))
+                .qualityMaxCentreOffset(r.decimal("quality.max.centre.offset", false, DEFAULT_QUALITY_MAX_CENTRE_OFFSET, 0.05,
+                        0.5))
+                .qualityMinSharpness(r.decimal("quality.min.sharpness", false, DEFAULT_QUALITY_MIN_SHARPNESS, 0.0, 1.0))
+                .qualityMinBrightness(minBrightness)
+                .qualityMaxBrightness(maxBrightness)
                 .build();
     }
 

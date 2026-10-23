@@ -28,6 +28,11 @@ public final class LivenessPolicy {
     private final double bindMinSimilarity;
     private final long bindFreshnessMaxAgeMs;
     private final double detectorMinScore;
+    private final double qualityMinFaceWidth;
+    private final double qualityMaxCentreOffset;
+    private final double qualityMinSharpness;
+    private final double qualityMinBrightness;
+    private final double qualityMaxBrightness;
     private final List<String> warnings;
 
     private LivenessPolicy(Builder b) {
@@ -49,6 +54,11 @@ public final class LivenessPolicy {
         this.bindMinSimilarity = b.bindMinSimilarity;
         this.bindFreshnessMaxAgeMs = b.bindFreshnessMaxAgeMs;
         this.detectorMinScore = b.detectorMinScore;
+        this.qualityMinFaceWidth = b.qualityMinFaceWidth;
+        this.qualityMaxCentreOffset = b.qualityMaxCentreOffset;
+        this.qualityMinSharpness = b.qualityMinSharpness;
+        this.qualityMinBrightness = b.qualityMinBrightness;
+        this.qualityMaxBrightness = b.qualityMaxBrightness;
         this.warnings = Collections.unmodifiableList(new ArrayList<String>(b.warnings));
     }
 
@@ -155,6 +165,31 @@ public final class LivenessPolicy {
         return detectorMinScore;
     }
 
+    /** @return minimum face width as a share of the frame width (0.05..0.9) */
+    public double qualityMinFaceWidth() {
+        return qualityMinFaceWidth;
+    }
+
+    /** @return largest allowed distance of the face centre from the frame centre, as a share of the frame size (0.05..0.5) */
+    public double qualityMaxCentreOffset() {
+        return qualityMaxCentreOffset;
+    }
+
+    /** @return minimum face sharpness, 0..1 (normalised Laplacian variance) */
+    public double qualityMinSharpness() {
+        return qualityMinSharpness;
+    }
+
+    /** @return minimum mean luma of the face, 0..1 */
+    public double qualityMinBrightness() {
+        return qualityMinBrightness;
+    }
+
+    /** @return maximum mean luma of the face, 0..1 */
+    public double qualityMaxBrightness() {
+        return qualityMaxBrightness;
+    }
+
     /** @return problems found while building the policy, such as invalid values replaced by defaults; unmodifiable */
     public List<String> warnings() {
         return warnings;
@@ -180,6 +215,11 @@ public final class LivenessPolicy {
         private double bindMinSimilarity;
         private long bindFreshnessMaxAgeMs;
         private double detectorMinScore;
+        private double qualityMinFaceWidth;
+        private double qualityMaxCentreOffset;
+        private double qualityMinSharpness;
+        private double qualityMinBrightness;
+        private double qualityMaxBrightness;
         private final List<String> warnings = new ArrayList<String>();
 
         private Builder(Workflow workflow) {
@@ -288,6 +328,36 @@ public final class LivenessPolicy {
         /** @param value see {@link LivenessPolicy#detectorMinScore()} @return this builder */
         public Builder detectorMinScore(double value) {
             this.detectorMinScore = value;
+            return this;
+        }
+
+        /** @param value see {@link LivenessPolicy#qualityMinFaceWidth()} @return this builder */
+        public Builder qualityMinFaceWidth(double value) {
+            this.qualityMinFaceWidth = value;
+            return this;
+        }
+
+        /** @param value see {@link LivenessPolicy#qualityMaxCentreOffset()} @return this builder */
+        public Builder qualityMaxCentreOffset(double value) {
+            this.qualityMaxCentreOffset = value;
+            return this;
+        }
+
+        /** @param value see {@link LivenessPolicy#qualityMinSharpness()} @return this builder */
+        public Builder qualityMinSharpness(double value) {
+            this.qualityMinSharpness = value;
+            return this;
+        }
+
+        /** @param value see {@link LivenessPolicy#qualityMinBrightness()} @return this builder */
+        public Builder qualityMinBrightness(double value) {
+            this.qualityMinBrightness = value;
+            return this;
+        }
+
+        /** @param value see {@link LivenessPolicy#qualityMaxBrightness()} @return this builder */
+        public Builder qualityMaxBrightness(double value) {
+            this.qualityMaxBrightness = value;
             return this;
         }
 
