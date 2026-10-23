@@ -46,10 +46,20 @@ public final class YuNetDetector implements AutoCloseable {
 
     /**
      * @param frame an RGB frame of any size
-     * @return the faces found, highest score first; empty when there is none
+     * @return the faces found with OpenCV's default minimum score (0.9), highest score first; empty when none
      * @throws IllegalStateException if inference fails
      */
     public List<FaceDetection> detect(FaceFrame frame) {
+        return detect(frame, SCORE_THRESHOLD);
+    }
+
+    /**
+     * @param frame    an RGB frame of any size
+     * @param minScore the minimum confidence for a face to count ({@code LivenessPolicy.detectorMinScore()})
+     * @return the faces found, highest score first; empty when there is none
+     * @throws IllegalStateException if inference fails
+     */
+    public List<FaceDetection> detect(FaceFrame frame, float minScore) {
         float scale = (float) SIZE / Math.max(frame.width(), frame.height());
         float[] input = letterboxBgr(frame, scale);
         try (OnnxTensor tensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(input), new long[] {1, 3, SIZE, SIZE});
@@ -57,7 +67,7 @@ public final class YuNetDetector implements AutoCloseable {
             List<FaceDetection> candidates = new ArrayList<FaceDetection>();
             for (int stride : STRIDES) {
                 decode(stride, values(result, "cls_" + stride), values(result, "obj_" + stride),
-                        values(result, "bbox_" + stride), values(result, "kps_" + stride), scale, candidates);
+                        values(result, "bbox_" + stride), values(result, "kps_" + stride), scale, minScore, candidates);
             }
             return nms(candidates);
         } catch (OrtException e) {
@@ -118,11 +128,11 @@ public final class YuNetDetector implements AutoCloseable {
     }
 
     private static void decode(int stride, float[] cls, float[] obj, float[] bbox, float[] kps, float scale,
-            List<FaceDetection> out) {
+            float minScore, List<FaceDetection> out) {
         int cols = SIZE / stride;
         for (int i = 0; i < cls.length; i++) {
             float score = (float) Math.sqrt(clamp(cls[i]) * clamp(obj[i]));
-            if (score < SCORE_THRESHOLD) {
+            if (score < minScore) {
                 continue;
             }
             int r = i / cols;

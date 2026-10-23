@@ -59,6 +59,8 @@ public final class LivenessConfigLoader {
     public static final double DEFAULT_BIND_MIN_SIMILARITY = 0.60;
     /** Default for {@code bind.freshness.max.age.ms}. */
     public static final long DEFAULT_BIND_FRESHNESS_MAX_AGE_MS = 60000L;
+    /** Default for {@code detector.min.score}: OpenCV's FaceDetectorYN default. */
+    public static final double DEFAULT_DETECTOR_MIN_SCORE = 0.90;
     /** Upper bound for {@code challenge.min.count} and {@code challenge.max.count}. */
     public static final int MAX_CHALLENGES = 5;
 
@@ -104,6 +106,7 @@ public final class LivenessConfigLoader {
                 .bindMinSimilarity(r.decimal("bind.min.similarity", false, DEFAULT_BIND_MIN_SIMILARITY, 0.0, 1.0))
                 .bindFreshnessMaxAgeMs(r.integer("bind.freshness.max.age.ms", false,
                         DEFAULT_BIND_FRESHNESS_MAX_AGE_MS, 1000L, 300000L))
+                .detectorMinScore(r.decimal("detector.min.score", false, DEFAULT_DETECTOR_MIN_SCORE, 0.5, 0.99))
                 .build();
     }
 

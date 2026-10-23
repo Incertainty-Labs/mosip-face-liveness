@@ -55,6 +55,13 @@ class YuNetDetectorTest {
     }
 
     @Test
+    @DisplayName("The minimum score decides what counts as a face (MOSIP face scores 0.949)")
+    void minimumScoreIsApplied() throws IOException {
+        assertAll(() -> assertEquals(1, detector.detect(frame(face()), 0.90f).size()),
+                () -> assertEquals(0, detector.detect(frame(face()), 0.96f).size()));
+    }
+
+    @Test
     @DisplayName("A frame without a face gives no detections")
     void blankFrameHasNoFace() {
         BufferedImage blank = new BufferedImage(320, 240, BufferedImage.TYPE_INT_RGB);

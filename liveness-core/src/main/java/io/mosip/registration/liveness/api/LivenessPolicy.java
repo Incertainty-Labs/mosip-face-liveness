@@ -27,6 +27,7 @@ public final class LivenessPolicy {
     private final boolean bindCaptureEnabled;
     private final double bindMinSimilarity;
     private final long bindFreshnessMaxAgeMs;
+    private final double detectorMinScore;
     private final List<String> warnings;
 
     private LivenessPolicy(Builder b) {
@@ -47,6 +48,7 @@ public final class LivenessPolicy {
         this.bindCaptureEnabled = b.bindCaptureEnabled;
         this.bindMinSimilarity = b.bindMinSimilarity;
         this.bindFreshnessMaxAgeMs = b.bindFreshnessMaxAgeMs;
+        this.detectorMinScore = b.detectorMinScore;
         this.warnings = Collections.unmodifiableList(new ArrayList<String>(b.warnings));
     }
 
@@ -148,6 +150,11 @@ public final class LivenessPolicy {
         return bindFreshnessMaxAgeMs;
     }
 
+    /** @return the face detector's minimum confidence (0.5..0.99) for a face to count; lower it for dim rooms */
+    public double detectorMinScore() {
+        return detectorMinScore;
+    }
+
     /** @return problems found while building the policy, such as invalid values replaced by defaults; unmodifiable */
     public List<String> warnings() {
         return warnings;
@@ -172,6 +179,7 @@ public final class LivenessPolicy {
         private boolean bindCaptureEnabled;
         private double bindMinSimilarity;
         private long bindFreshnessMaxAgeMs;
+        private double detectorMinScore;
         private final List<String> warnings = new ArrayList<String>();
 
         private Builder(Workflow workflow) {
@@ -274,6 +282,12 @@ public final class LivenessPolicy {
         /** @param value see {@link LivenessPolicy#bindFreshnessMaxAgeMs()} @return this builder */
         public Builder bindFreshnessMaxAgeMs(long value) {
             this.bindFreshnessMaxAgeMs = value;
+            return this;
+        }
+
+        /** @param value see {@link LivenessPolicy#detectorMinScore()} @return this builder */
+        public Builder detectorMinScore(double value) {
+            this.detectorMinScore = value;
             return this;
         }
 

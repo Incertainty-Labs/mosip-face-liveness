@@ -52,7 +52,21 @@ class LivenessConfigLoaderTest {
                 () -> assertTrue(policy.bindCaptureEnabled()),
                 () -> assertEquals(0.60, policy.bindMinSimilarity(), 1e-9),
                 () -> assertEquals(60000L, policy.bindFreshnessMaxAgeMs()),
+                () -> assertEquals(0.90, policy.detectorMinScore(), 1e-9),
                 () -> assertEquals(Collections.emptyList(), policy.warnings()));
+    }
+
+    @Test
+    @DisplayName("detector.min.score can be lowered for dim rooms, for every workflow")
+    void detectorMinScoreIsConfigurable() {
+        Map<String, String> config = new HashMap<String, String>();
+        config.put("mosip.registration.face.liveness.detector.min.score", "0.75");
+
+        assertAll(
+                () -> assertEquals(0.75, LivenessConfigLoader.load(config, Workflow.RESIDENT_REGISTRATION)
+                        .detectorMinScore(), 1e-9),
+                () -> assertEquals(0.75, LivenessConfigLoader.load(config, Workflow.OPERATOR_LOGIN)
+                        .detectorMinScore(), 1e-9));
     }
 
     @Test
@@ -102,7 +116,9 @@ class LivenessConfigLoaderTest {
                 Arguments.of("max.retries", "11", 3, (Function<LivenessPolicy, Number>) LivenessPolicy::maxRetries),
                 Arguments.of("bind.min.similarity", "1.01", 0.60, (Function<LivenessPolicy, Number>) LivenessPolicy::bindMinSimilarity),
                 Arguments.of("bind.freshness.max.age.ms", "999", 60000L, (Function<LivenessPolicy, Number>) LivenessPolicy::bindFreshnessMaxAgeMs),
-                Arguments.of("bind.freshness.max.age.ms", "300001", 60000L, (Function<LivenessPolicy, Number>) LivenessPolicy::bindFreshnessMaxAgeMs));
+                Arguments.of("bind.freshness.max.age.ms", "300001", 60000L, (Function<LivenessPolicy, Number>) LivenessPolicy::bindFreshnessMaxAgeMs),
+                Arguments.of("detector.min.score", "0.49", 0.90, (Function<LivenessPolicy, Number>) LivenessPolicy::detectorMinScore),
+                Arguments.of("detector.min.score", "1.0", 0.90, (Function<LivenessPolicy, Number>) LivenessPolicy::detectorMinScore));
     }
 
     @ParameterizedTest(name = "{0}={1} falls back to {2}")
