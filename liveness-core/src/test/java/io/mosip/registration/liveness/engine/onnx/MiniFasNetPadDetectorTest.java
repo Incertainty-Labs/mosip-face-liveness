@@ -52,7 +52,7 @@ class MiniFasNetPadDetectorTest {
         "minivision-sample-T1.png, -1,  0, 119, 113, 170, 240, 0.99976, 1.00000, upstream real face",
         "minivision-sample-F1.png, -1,  0, 188, 110, 196, 240, 0.01400, 0.43244, upstream spoof 1",
         "minivision-sample-F2.png, -1,  0, 139, 217, 223, 298, 0.00041, 0.00588, upstream spoof 2"})
-    @DisplayName("TC-ENG-PAD-01 the real-face probability matches the upstream pipeline on the same box")
+    @DisplayName("The real-face probability matches the upstream pipeline on the same box")
     void matchesUpstream(String image, int canvasX, int canvasY, int x, int y, int w, int h, double expectedV2,
             double expectedV1se, String why) throws IOException {
         FaceFrame frame = YuNetDetectorTest.frame(placed(image, canvasX, canvasY));
@@ -69,7 +69,7 @@ class MiniFasNetPadDetectorTest {
         " 90, 120, 30, 30, 0.85457, 0.38375",
         " 70, 100, 40, 40, 0.23320, 0.98417",
         "120, 160, 24, 30, 0.82796, 0.25067"})
-    @DisplayName("TC-ENG-PAD-01 small crops, scaled up to 80x80, match too: one grey level off would move them by 0.01"
+    @DisplayName("Small crops, scaled up to 80x80, match too: one grey level off would move them by 0.01"
             + " or more")
     void matchesUpstreamOnSmallCrops(int x, int y, int w, int h, double expectedV2, double expectedV1se)
             throws IOException {
