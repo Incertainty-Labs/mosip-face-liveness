@@ -62,8 +62,11 @@ public final class LivenessConfigLoader {
     public static final double DEFAULT_BIND_MIN_SIMILARITY = 0.60;
     /** Default for {@code bind.freshness.max.age.ms}. */
     public static final long DEFAULT_BIND_FRESHNESS_MAX_AGE_MS = 60000L;
-    /** Default for {@code detector.min.score}: OpenCV's FaceDetectorYN default. */
-    public static final double DEFAULT_DETECTOR_MIN_SCORE = 0.90;
+    /**
+     * Default for {@code detector.min.score}: 0.70, as TECHNICAL_DESIGN first set it. OpenCV's 0.90 lost the face in 31 of
+     * 41 frames of a real look-up, so LOOK_UP could not pass; at 0.70 no bona fide clip gained a false face (A-11).
+     */
+    public static final double DEFAULT_DETECTOR_MIN_SCORE = 0.70;
     /**
      * Default for {@code quality.min.face.width}: 0.18 of the frame width, 115 px on 640. TECHNICAL_DESIGN had a quarter,
      * but at a desk webcam real faces measured 125 to 191 px and MiniFASNet scored them 0.84 to 0.99 (A-09).
