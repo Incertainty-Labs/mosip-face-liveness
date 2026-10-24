@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-24
+
+The real engine: on-device face analysis, passive PAD and random challenges, loaded from a verified model bundle. Defaults for the face detector and the quality gate were set on one team member's real webcam clips; see each entry.
+
 ### Added
 
 - `liveness-desktop`: `JpegFrames.decode` turns one JPEG of an SBI live stream into an RGB `FaceFrame` (API.md §4.2), and an MJPEG part reader reads `multipart/x-mixed-replace` streams by `Content-Length`, or up to the JPEG end marker when a device leaves that header out. Checked against MockMDS's exact framing.
@@ -34,6 +38,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Changed
 
+- `FaceFrame` is now defined as upright and not mirrored, as the camera sees the person: every model assumes an upright face, and in a mirrored frame yaw changes sign. Clients may mirror their preview, never the frames they hand to the engine.
 - The `pad.weights` default is now `minifasnet_v2:0.5,minifasnet_v1se:0.5` (API.md §5 had `minifasnet_v2:0.45,minifasnet_v1se:0.45,moire:0.10`). The moire cue was cut from A-09, so a config that still lists `moire` gets a warning and the two MiniFASNet weights are renormalised.
 
 ## [0.1.3] - 2026-10-21

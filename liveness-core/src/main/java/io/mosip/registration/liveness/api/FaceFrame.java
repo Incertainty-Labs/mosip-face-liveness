@@ -4,6 +4,10 @@ package io.mosip.registration.liveness.api;
  * One decoded frame from any {@link FrameSource}: packed 8-bit RGB, row-major, no alpha. Decoding (JPEG, YUV,
  * JPEG 2000) happens in the source adapter, never in the engine.
  *
+ * <p>The frame is upright and not mirrored, as the camera sees the person. Every model assumes an upright face, and
+ * head pose depends on it: in a mirrored frame yaw changes sign, so "turn left" would be checked as "turn right". A
+ * client may mirror its on-screen preview, but never the frames it hands to the engine.
+ *
  * <p>Immutable by contract. The pixel buffer is not copied, to keep per-frame cost low on Android; producers hand
  * over a fresh buffer and nobody may modify {@link #rgb()} afterwards.
  */
