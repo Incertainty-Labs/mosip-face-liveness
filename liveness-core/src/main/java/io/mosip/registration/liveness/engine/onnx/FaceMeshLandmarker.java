@@ -41,6 +41,16 @@ public final class FaceMeshLandmarker implements AutoCloseable {
     }
 
     /**
+     * @param model the Face Mesh V2 ONNX file's bytes, for example from a verified {@code ModelRegistry}
+     * @return the model
+     * @throws OrtException if the model cannot be loaded
+     */
+    public static FaceMeshLandmarker load(byte[] model) throws OrtException {
+        OrtEnvironment env = OrtEnvironment.getEnvironment();
+        return new FaceMeshLandmarker(env, env.createSession(model, new OrtSession.SessionOptions()));
+    }
+
+    /**
      * @param frame the frame
      * @param face  the face found in it by {@link YuNetDetector}
      * @return the 478 landmarks in frame pixels

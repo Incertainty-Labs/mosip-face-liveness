@@ -6,6 +6,7 @@ import io.mosip.registration.liveness.api.FaceFrame;
 import io.mosip.registration.liveness.api.FaceObservation;
 import io.mosip.registration.liveness.api.Rect;
 import io.mosip.registration.liveness.engine.FrameQuality;
+import io.mosip.registration.liveness.model.ModelRegistry;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -46,6 +47,30 @@ public final class OnnxFaceAnalyzer implements FaceAnalyzer, AutoCloseable {
         try {
             landmarker = FaceMeshLandmarker.load(modelDir.resolve(MESH_FILE));
             BlendshapeScorer scorer = BlendshapeScorer.load(modelDir.resolve(BLENDSHAPE_FILE));
+            return new OnnxFaceAnalyzer(detector, landmarker, scorer, (float) minScore);
+        } catch (OrtException | RuntimeException e) {
+            detector.close();
+            if (landmarker != null) {
+                landmarker.close();
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Loads the three models from a verified bundle; Android reads them from its assets this way.
+     *
+     * @param registry the model bundle, with {@code yunet}, {@code facemesh_v2} and {@code blendshape_v2}
+     * @param minScore the minimum detector confidence for a face to count ({@code LivenessPolicy.detectorMinScore()})
+     * @return the analyzer
+     * @throws OrtException if a model cannot be loaded
+     */
+    public static OnnxFaceAnalyzer load(ModelRegistry registry, double minScore) throws OrtException {
+        YuNetDetector detector = YuNetDetector.load(registry.bytes("yunet"));
+        FaceMeshLandmarker landmarker = null;
+        try {
+            landmarker = FaceMeshLandmarker.load(registry.bytes("facemesh_v2"));
+            BlendshapeScorer scorer = BlendshapeScorer.load(registry.bytes("blendshape_v2"));
             return new OnnxFaceAnalyzer(detector, landmarker, scorer, (float) minScore);
         } catch (OrtException | RuntimeException e) {
             detector.close();

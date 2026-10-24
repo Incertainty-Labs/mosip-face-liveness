@@ -45,6 +45,16 @@ public final class YuNetDetector implements AutoCloseable {
     }
 
     /**
+     * @param model the YuNet 2023mar ONNX file's bytes, for example from a verified {@code ModelRegistry}
+     * @return the model
+     * @throws OrtException if the model cannot be loaded
+     */
+    public static YuNetDetector load(byte[] model) throws OrtException {
+        OrtEnvironment env = OrtEnvironment.getEnvironment();
+        return new YuNetDetector(env, env.createSession(model, new OrtSession.SessionOptions()));
+    }
+
+    /**
      * @param frame an RGB frame of any size
      * @return the faces found with OpenCV's default minimum score (0.9), highest score first; empty when none
      * @throws IllegalStateException if inference fails

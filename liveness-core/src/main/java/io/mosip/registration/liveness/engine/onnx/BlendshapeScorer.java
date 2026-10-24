@@ -56,6 +56,16 @@ public final class BlendshapeScorer implements AutoCloseable {
     }
 
     /**
+     * @param model the Blendshape V2 ONNX file's bytes, for example from a verified {@code ModelRegistry}
+     * @return the model
+     * @throws OrtException if the model cannot be loaded
+     */
+    public static BlendshapeScorer load(byte[] model) throws OrtException {
+        OrtEnvironment env = OrtEnvironment.getEnvironment();
+        return new BlendshapeScorer(env, env.createSession(model, new OrtSession.SessionOptions()));
+    }
+
+    /**
      * @param mesh the face's landmarks
      * @return the 52 blendshape scores, 0..1
      * @throws IllegalStateException if inference fails

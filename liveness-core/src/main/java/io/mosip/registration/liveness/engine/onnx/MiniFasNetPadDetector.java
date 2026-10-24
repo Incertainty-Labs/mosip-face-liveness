@@ -10,6 +10,7 @@ import io.mosip.registration.liveness.api.PadDetector;
 import io.mosip.registration.liveness.api.PadScore;
 import io.mosip.registration.liveness.api.Rect;
 import java.nio.FloatBuffer;
+import io.mosip.registration.liveness.model.ModelRegistry;
 import java.nio.file.Path;
 import java.util.Collections;
 
@@ -56,6 +57,22 @@ public final class MiniFasNetPadDetector implements PadDetector, AutoCloseable {
         OrtEnvironment env = OrtEnvironment.getEnvironment();
         return new MiniFasNetPadDetector(env, env.createSession(model.toString(), new OrtSession.SessionOptions()),
                 scale, name, version);
+    }
+
+    /**
+     * Loads the model from a verified bundle; Android reads it from its assets this way.
+     *
+     * @param registry the model bundle
+     * @param name     the model and cue name in the bundle, for example {@code minifasnet_v2}; its version is the
+     *                 bundle's
+     * @param scale    the crop scale the model was trained with (2.7 for MiniFASNetV2, 4.0 for MiniFASNetV1SE)
+     * @return the detector
+     * @throws OrtException if the model cannot be loaded
+     */
+    public static MiniFasNetPadDetector load(ModelRegistry registry, String name, double scale) throws OrtException {
+        OrtEnvironment env = OrtEnvironment.getEnvironment();
+        return new MiniFasNetPadDetector(env, env.createSession(registry.bytes(name), new OrtSession.SessionOptions()),
+                scale, name, registry.versions().get(name));
     }
 
     @Override
