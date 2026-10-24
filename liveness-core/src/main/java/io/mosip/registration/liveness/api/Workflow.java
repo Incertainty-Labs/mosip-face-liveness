@@ -4,6 +4,11 @@ package io.mosip.registration.liveness.api;
 public enum Workflow {
     /** Resident face capture during a new registration, update, lost or correction. */
     RESIDENT_REGISTRATION("registration"),
+    /**
+     * The exception photo taken when a resident has biometric exceptions. Its mode defaults to PASSIVE, and only its
+     * own key ({@code policy.exception_photo.mode}) changes it: the person may not be able to do the challenges.
+     */
+    RESIDENT_EXCEPTION_PHOTO("exception_photo"),
     /** Face capture while onboarding or updating an operator's biometrics. */
     OPERATOR_ONBOARDING("onboard_auth"),
     /** Operator login with face. */

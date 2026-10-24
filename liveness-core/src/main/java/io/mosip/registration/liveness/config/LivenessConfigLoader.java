@@ -133,7 +133,10 @@ public final class LivenessConfigLoader {
 
         return b
                 .enabled(r.bool("enabled", false, DEFAULT_ENABLED))
-                .mode(r.enumValue("mode", true, LivenessMode.class, DEFAULT_MODE))
+                .mode(workflow == Workflow.RESIDENT_EXCEPTION_PHOTO
+                        // The person may not be able to do challenges: only the workflow's own key changes it
+                        ? r.workflowOnlyEnum("mode", LivenessMode.class, LivenessMode.PASSIVE)
+                        : r.enumValue("mode", true, LivenessMode.class, DEFAULT_MODE))
                 .passiveThreshold(r.decimal("passive.threshold", true, DEFAULT_PASSIVE_THRESHOLD, 0.0, 1.0))
                 .passiveMinFrames(r.integer("passive.min.frames", false, DEFAULT_PASSIVE_MIN_FRAMES, 3, 60))
                 .activeEnabled(r.bool("active.enabled", true, DEFAULT_ACTIVE_ENABLED))
@@ -285,7 +288,15 @@ public final class LivenessConfigLoader {
         }
 
         <E extends Enum<E>> E enumValue(String setting, boolean perWorkflow, Class<E> type, E defaultValue) {
-            String key = keyFor(setting, perWorkflow);
+            return enumValue(keyFor(setting, perWorkflow), type, defaultValue);
+        }
+
+        /** Reads only the per-workflow key, ignoring the global one. */
+        <E extends Enum<E>> E workflowOnlyEnum(String setting, Class<E> type, E defaultValue) {
+            return enumValue(hasValue(policyPrefix + setting) ? policyPrefix + setting : null, type, defaultValue);
+        }
+
+        private <E extends Enum<E>> E enumValue(String key, Class<E> type, E defaultValue) {
             if (key == null) {
                 return defaultValue;
             }

@@ -301,6 +301,26 @@ class LivenessConfigLoaderTest {
                 () -> assertTrue(policy.warnings().get(0).contains("moire"), policy.warnings().get(0)));
     }
 
+    @Test
+    @DisplayName("The exception photo defaults to a passive-only check (no challenges for a person who may not be able"
+            + " to do them); its own policy key still changes it, and every other workflow stays HYBRID")
+    void exceptionPhotoDefaultsToPassive() {
+        Map<String, String> config = new HashMap<String, String>();
+        config.put("mosip.registration.face.liveness.policy.exception_photo.mode", "HYBRID");
+
+        assertAll(
+                () -> assertEquals(LivenessMode.PASSIVE, LivenessConfigLoader.load(Collections.<String, String>emptyMap(),
+                        Workflow.RESIDENT_EXCEPTION_PHOTO).mode()),
+                () -> assertEquals(LivenessMode.HYBRID,
+                        LivenessConfigLoader.load(config, Workflow.RESIDENT_EXCEPTION_PHOTO).mode()),
+                () -> assertEquals("exception_photo", Workflow.RESIDENT_EXCEPTION_PHOTO.policyCode()),
+                () -> assertEquals(LivenessMode.PASSIVE, LivenessConfigLoader.load(Collections.singletonMap(
+                        "mosip.registration.face.liveness.mode", "ACTIVE"), Workflow.RESIDENT_EXCEPTION_PHOTO).mode(),
+                        "a global mode does not reach the exception photo; only its own key does"),
+                () -> assertEquals(LivenessMode.HYBRID, LivenessConfigLoader.load(
+                        Collections.<String, String>emptyMap(), Workflow.RESIDENT_REGISTRATION).mode()));
+    }
+
     private static Map<String, Double> weights(Object... nameWeight) {
         Map<String, Double> weights = new LinkedHashMap<String, Double>();
         for (int i = 0; i < nameWeight.length; i += 2) {
