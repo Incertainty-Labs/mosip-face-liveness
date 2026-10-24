@@ -82,6 +82,15 @@ public final class OnnxFaceAnalyzer implements FaceAnalyzer, AutoCloseable {
     }
 
     /**
+     * @param minScore the minimum detector confidence for a face to count ({@code LivenessPolicy.detectorMinScore()})
+     * @return an analyzer that shares this one's models and uses {@code minScore}; closing it closes the shared models
+     *         too, so close only the original
+     */
+    public OnnxFaceAnalyzer withMinScore(double minScore) {
+        return new OnnxFaceAnalyzer(detector, landmarker, scorer, (float) minScore);
+    }
+
+    /**
      * @param frame the frame
      * @return what was seen; {@code faceCount = 0} and every measure NaN when there is no face
      * @throws IllegalStateException if inference fails
