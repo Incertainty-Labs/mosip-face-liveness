@@ -8,9 +8,12 @@ import io.mosip.registration.liveness.api.Workflow;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Builds a {@link LivenessPolicy} for one workflow from the flat registration-client configuration map, using the
@@ -71,6 +74,21 @@ public final class LivenessConfigLoader {
     public static final double DEFAULT_QUALITY_MIN_BRIGHTNESS = 0.235;
     /** Default for {@code quality.max.brightness}: mean luma 200 of 255. */
     public static final double DEFAULT_QUALITY_MAX_BRIGHTNESS = 0.784;
+    /** Default for {@code pad.weights}: the two MiniFASNet models equally (the moire cue was cut, A-09). */
+    public static final Map<String, Double> DEFAULT_PAD_WEIGHTS;
+
+    static {
+        Map<String, Double> weights = new LinkedHashMap<String, Double>();
+        weights.put("minifasnet_v2", 0.5);
+        weights.put("minifasnet_v1se", 0.5);
+        DEFAULT_PAD_WEIGHTS = Collections.unmodifiableMap(weights);
+    }
+
+    /** The passive PAD cues this build has, by {@code PadDetector.name()}; {@code pad.weights} may name only these. */
+    static final Set<String> PAD_CUES = Collections.unmodifiableSet(
+            new LinkedHashSet<String>(Arrays.asList("minifasnet_v2", "minifasnet_v1se")));
+    /** How far the {@code pad.weights} sum may be from 1. */
+    private static final double WEIGHT_SUM_TOLERANCE = 0.001;
     /** Upper bound for {@code challenge.min.count} and {@code challenge.max.count}. */
     public static final int MAX_CHALLENGES = 5;
 
@@ -132,6 +150,7 @@ public final class LivenessConfigLoader {
                 .qualityMinSharpness(r.decimal("quality.min.sharpness", false, DEFAULT_QUALITY_MIN_SHARPNESS, 0.0, 1.0))
                 .qualityMinBrightness(minBrightness)
                 .qualityMaxBrightness(maxBrightness)
+                .padWeights(r.weights("pad.weights", DEFAULT_PAD_WEIGHTS))
                 .build();
     }
 
@@ -206,6 +225,47 @@ public final class LivenessConfigLoader {
                 pool.add(type);
             }
             return pool;
+        }
+
+        /**
+         * {@code name:weight,name:weight}, global only. Each weight is within 0..1, each name appears once and the
+         * weights sum to 1; names of cues this build does not have are dropped (the caller renormalises).
+         */
+        Map<String, Double> weights(String setting, Map<String, Double> defaultValue) {
+            String key = keyFor(setting, false);
+            if (key == null) {
+                return defaultValue;
+            }
+            Map<String, Double> weights = new LinkedHashMap<String, Double>();
+            double sum = 0;
+            for (String entry : value(key).split(",", -1)) {
+                String[] nameWeight = entry.split(":", -1);
+                if (nameWeight.length != 2 || weights.containsKey(nameWeight[0].trim())) {
+                    return invalid(key, defaultValue);
+                }
+                double weight;
+                try {
+                    weight = Double.parseDouble(nameWeight[1].trim());
+                } catch (NumberFormatException e) {
+                    return invalid(key, defaultValue);
+                }
+                if (!(weight >= 0.0 && weight <= 1.0)) {
+                    return invalid(key, defaultValue);
+                }
+                weights.put(nameWeight[0].trim(), weight);
+                sum += weight;
+            }
+            if (Math.abs(sum - 1.0) > WEIGHT_SUM_TOLERANCE) {
+                return invalid(key, defaultValue);
+            }
+            for (String name : new ArrayList<String>(weights.keySet())) {
+                if (!PAD_CUES.contains(name)) {
+                    builder.warning("Unknown passive cue '" + name + "' in " + key + " (known: " + PAD_CUES
+                            + "); ignored");
+                    weights.remove(name);
+                }
+            }
+            return weights.isEmpty() ? invalid(key, defaultValue) : weights;
         }
 
         /** @return the challenge named, or {@code null} if unknown or not selectable (NEUTRAL_HOLD is always added) */

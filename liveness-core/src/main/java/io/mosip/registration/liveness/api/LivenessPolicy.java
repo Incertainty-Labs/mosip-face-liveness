@@ -2,7 +2,9 @@ package io.mosip.registration.liveness.api;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The resolved liveness settings for one workflow. Immutable; build it with {@link #builder(Workflow)}, normally
@@ -33,6 +35,7 @@ public final class LivenessPolicy {
     private final double qualityMinSharpness;
     private final double qualityMinBrightness;
     private final double qualityMaxBrightness;
+    private final Map<String, Double> padWeights;
     private final List<String> warnings;
 
     private LivenessPolicy(Builder b) {
@@ -59,6 +62,7 @@ public final class LivenessPolicy {
         this.qualityMinSharpness = b.qualityMinSharpness;
         this.qualityMinBrightness = b.qualityMinBrightness;
         this.qualityMaxBrightness = b.qualityMaxBrightness;
+        this.padWeights = Collections.unmodifiableMap(new LinkedHashMap<String, Double>(b.padWeights));
         this.warnings = Collections.unmodifiableList(new ArrayList<String>(b.warnings));
     }
 
@@ -190,6 +194,14 @@ public final class LivenessPolicy {
         return qualityMaxBrightness;
     }
 
+    /**
+     * @return fusion weight per passive PAD cue name, for example {@code minifasnet_v2}; the weights of the cues
+     *         actually loaded are renormalised to sum to 1; unmodifiable, in configured order
+     */
+    public Map<String, Double> padWeights() {
+        return padWeights;
+    }
+
     /** @return problems found while building the policy, such as invalid values replaced by defaults; unmodifiable */
     public List<String> warnings() {
         return warnings;
@@ -220,6 +232,7 @@ public final class LivenessPolicy {
         private double qualityMinSharpness;
         private double qualityMinBrightness;
         private double qualityMaxBrightness;
+        private Map<String, Double> padWeights = Collections.emptyMap();
         private final List<String> warnings = new ArrayList<String>();
 
         private Builder(Workflow workflow) {
@@ -358,6 +371,12 @@ public final class LivenessPolicy {
         /** @param value see {@link LivenessPolicy#qualityMaxBrightness()} @return this builder */
         public Builder qualityMaxBrightness(double value) {
             this.qualityMaxBrightness = value;
+            return this;
+        }
+
+        /** @param value see {@link LivenessPolicy#padWeights()}; copied @return this builder */
+        public Builder padWeights(Map<String, Double> value) {
+            this.padWeights = new LinkedHashMap<String, Double>(value);
             return this;
         }
 

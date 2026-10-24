@@ -17,8 +17,13 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - `liveness-core`: `OnnxFaceAnalyzer` is the on-device `FaceAnalyzer`. YuNet finds the faces, and the largest is measured: 478 landmarks, head pose, eye openness (1 - eyeBlink of the same eye, the person's own left and right), smile (mean of the two mouthSmile scores), mouth openness (jawOpen), sharpness and brightness. No face gives a count of 0 with every measure NaN. `OnnxFaceAnalyzer.load(modelDir, policy.detectorMinScore())`.
 - `liveness-core`: `MiniFasNetPadDetector` is a passive PAD cue with one Silent-Face-Anti-Spoofing MiniFASNet model (`minifasnet_v2` at 2.7x, `minifasnet_v1se` at 4.0x). Its crop, resize (bit for bit with OpenCV's fixed-point `cv2.resize`), BGR input and softmax match the upstream pipeline, checked against it in Python on MOSIP's face and Minivision's own real and spoof samples (added as test resources with their provenance).
 - `liveness-core`: `StaticStreamDetector` (`static_stream`) is a hard veto for a frozen stream (LIV-015): a still image or a paused video injected as the camera. The whole frame, shrunk to 64x48 grey, must differ from the previous frame by less than 0.15 grey levels on average, for at least 1 s and 5 frames; a live webcam measured 0.53 to 2.8. Frames without a face start the count again, so a covered lens gets guidance, not an attack verdict. MockMDS's `static` profile is vetoed after 1009 ms.
+- `pad.weights` is now read (`LivenessPolicy.padWeights()`, global only): `name:weight` pairs, each within 0..1, summing to 1. Unusable values fall back to the default with a warning; a cue this build does not have is ignored with a warning.
 - Five new global keys under `mosip.registration.face.liveness.quality.` for the gate's limits: `min.face.width` (default 0.25 of the frame width, range 0.05..0.9), `max.centre.offset` (0.25, range 0.05..0.5), `min.sharpness` (0.40), `min.brightness` (0.235, mean luma 60 of 255) and `max.brightness` (0.784, luma 200), the last three in 0..1. A minimum brightness not below the maximum gives a warning, and both fall back to their defaults.
 - A `BytecodeLevelTest` in every module fails the build when a compiled class is not at the module's release level (Java 8 for `liveness-core` and `face-verification`, Java 11 for `liveness-desktop` and `liveness-eval`), so a newer class left in `target/classes` by an editor cannot reach a jar.
+
+### Changed
+
+- The `pad.weights` default is now `minifasnet_v2:0.5,minifasnet_v1se:0.5` (API.md §5 had `minifasnet_v2:0.45,minifasnet_v1se:0.45,moire:0.10`). The moire cue was cut from A-09, so a config that still lists `moire` gets a warning and the two MiniFASNet weights are renormalised.
 
 ## [0.1.3] - 2026-10-21
 

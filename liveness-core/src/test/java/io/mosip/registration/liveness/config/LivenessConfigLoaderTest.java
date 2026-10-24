@@ -13,6 +13,7 @@ import io.mosip.registration.liveness.api.Workflow;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -58,6 +59,7 @@ class LivenessConfigLoaderTest {
                 () -> assertEquals(0.40, policy.qualityMinSharpness(), 1e-9),
                 () -> assertEquals(0.235, policy.qualityMinBrightness(), 1e-9),
                 () -> assertEquals(0.784, policy.qualityMaxBrightness(), 1e-9),
+                () -> assertEquals(weights("minifasnet_v2", 0.5, "minifasnet_v1se", 0.5), policy.padWeights()),
                 () -> assertEquals(Collections.emptyList(), policy.warnings()));
     }
 
@@ -245,5 +247,65 @@ class LivenessConfigLoaderTest {
                         LivenessConfigLoader.load(config, Workflow.OPERATOR_LOGIN).passiveThreshold(), 1e-9),
                 () -> assertEquals(0.7,
                         LivenessConfigLoader.load(config, Workflow.RESIDENT_REGISTRATION).passiveThreshold(), 1e-9));
+    }
+
+    @Test
+    @DisplayName("pad.weights sets the fusion weight of each passive cue, for every workflow")
+    void padWeightsAreConfigurable() {
+        Map<String, String> config = new HashMap<String, String>();
+        config.put("mosip.registration.face.liveness.pad.weights", " minifasnet_v2 : 0.7 , minifasnet_v1se:0.3");
+
+        assertAll(
+                () -> assertEquals(weights("minifasnet_v2", 0.7, "minifasnet_v1se", 0.3),
+                        LivenessConfigLoader.load(config, Workflow.RESIDENT_REGISTRATION).padWeights()),
+                () -> assertEquals(weights("minifasnet_v2", 0.7, "minifasnet_v1se", 0.3),
+                        LivenessConfigLoader.load(config, Workflow.SUPERVISOR_EOD_AUTH).padWeights()),
+                () -> assertEquals(Collections.emptyList(),
+                        LivenessConfigLoader.load(config, Workflow.RESIDENT_REGISTRATION).warnings()));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @ValueSource(strings = {
+        "minifasnet_v2:0.6,minifasnet_v1se:0.6",
+        "minifasnet_v2=0.5,minifasnet_v1se=0.5",
+        "minifasnet_v2:abc,minifasnet_v1se:0.5",
+        "minifasnet_v2:1.5,minifasnet_v1se:-0.5",
+        "minifasnet_v2:0.5,minifasnet_v2:0.5",
+        "moire:1.0"})
+    @DisplayName("Unusable pad.weights (sum not 1, malformed, not a number, out of 0..1, a name twice, no known cue)"
+            + " fall back to the default and are reported")
+    void invalidPadWeightsFallBackToDefault(String value) {
+        Map<String, String> config = new HashMap<String, String>();
+        config.put("mosip.registration.face.liveness.pad.weights", value);
+
+        LivenessPolicy policy = LivenessConfigLoader.load(config, Workflow.RESIDENT_REGISTRATION);
+
+        assertAll(
+                () -> assertEquals(weights("minifasnet_v2", 0.5, "minifasnet_v1se", 0.5), policy.padWeights()),
+                () -> assertFalse(policy.warnings().isEmpty(), "warned"),
+                () -> assertTrue(policy.warnings().get(policy.warnings().size() - 1)
+                        .contains("mosip.registration.face.liveness.pad.weights")));
+    }
+
+    @Test
+    @DisplayName("A cue this build does not have (the old moire default) is dropped and reported; the rest are kept")
+    void unknownPadCueIsDroppedAndReported() {
+        Map<String, String> config = new HashMap<String, String>();
+        config.put("mosip.registration.face.liveness.pad.weights", "minifasnet_v2:0.45,minifasnet_v1se:0.45,moire:0.10");
+
+        LivenessPolicy policy = LivenessConfigLoader.load(config, Workflow.RESIDENT_REGISTRATION);
+
+        assertAll(
+                () -> assertEquals(weights("minifasnet_v2", 0.45, "minifasnet_v1se", 0.45), policy.padWeights()),
+                () -> assertEquals(1, policy.warnings().size()),
+                () -> assertTrue(policy.warnings().get(0).contains("moire"), policy.warnings().get(0)));
+    }
+
+    private static Map<String, Double> weights(Object... nameWeight) {
+        Map<String, Double> weights = new LinkedHashMap<String, Double>();
+        for (int i = 0; i < nameWeight.length; i += 2) {
+            weights.put((String) nameWeight[i], (Double) nameWeight[i + 1]);
+        }
+        return weights;
     }
 }
