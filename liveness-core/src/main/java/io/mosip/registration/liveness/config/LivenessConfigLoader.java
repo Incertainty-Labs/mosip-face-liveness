@@ -64,8 +64,11 @@ public final class LivenessConfigLoader {
     public static final long DEFAULT_BIND_FRESHNESS_MAX_AGE_MS = 60000L;
     /** Default for {@code detector.min.score}: OpenCV's FaceDetectorYN default. */
     public static final double DEFAULT_DETECTOR_MIN_SCORE = 0.90;
-    /** Default for {@code quality.min.face.width}: a quarter of the frame width (TECHNICAL_DESIGN quality checks). */
-    public static final double DEFAULT_QUALITY_MIN_FACE_WIDTH = 0.25;
+    /**
+     * Default for {@code quality.min.face.width}: 0.18 of the frame width, 115 px on 640. TECHNICAL_DESIGN had a quarter,
+     * but at a desk webcam real faces measured 125 to 191 px and MiniFASNet scored them 0.84 to 0.99 (A-09).
+     */
+    public static final double DEFAULT_QUALITY_MIN_FACE_WIDTH = 0.18;
     /** Default for {@code quality.max.centre.offset}: centre within the middle half of the frame. */
     public static final double DEFAULT_QUALITY_MAX_CENTRE_OFFSET = 0.25;
     /** Default for {@code quality.min.sharpness}: sharp faces measure 0.6 to 0.9, blurred ones 0.1 to 0.3. */

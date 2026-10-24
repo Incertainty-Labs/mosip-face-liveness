@@ -54,7 +54,7 @@ class LivenessConfigLoaderTest {
                 () -> assertEquals(0.60, policy.bindMinSimilarity(), 1e-9),
                 () -> assertEquals(60000L, policy.bindFreshnessMaxAgeMs()),
                 () -> assertEquals(0.90, policy.detectorMinScore(), 1e-9),
-                () -> assertEquals(0.25, policy.qualityMinFaceWidth(), 1e-9),
+                () -> assertEquals(0.18, policy.qualityMinFaceWidth(), 1e-9),
                 () -> assertEquals(0.25, policy.qualityMaxCentreOffset(), 1e-9),
                 () -> assertEquals(0.40, policy.qualityMinSharpness(), 1e-9),
                 () -> assertEquals(0.235, policy.qualityMinBrightness(), 1e-9),
@@ -126,7 +126,7 @@ class LivenessConfigLoaderTest {
                 Arguments.of("bind.freshness.max.age.ms", "300001", 60000L, (Function<LivenessPolicy, Number>) LivenessPolicy::bindFreshnessMaxAgeMs),
                 Arguments.of("detector.min.score", "0.49", 0.90, (Function<LivenessPolicy, Number>) LivenessPolicy::detectorMinScore),
                 Arguments.of("detector.min.score", "1.0", 0.90, (Function<LivenessPolicy, Number>) LivenessPolicy::detectorMinScore),
-                Arguments.of("quality.min.face.width", "0.04", 0.25, (Function<LivenessPolicy, Number>) LivenessPolicy::qualityMinFaceWidth),
+                Arguments.of("quality.min.face.width", "0.04", 0.18, (Function<LivenessPolicy, Number>) LivenessPolicy::qualityMinFaceWidth),
                 Arguments.of("quality.max.centre.offset", "0.6", 0.25, (Function<LivenessPolicy, Number>) LivenessPolicy::qualityMaxCentreOffset),
                 Arguments.of("quality.min.sharpness", "1.2", 0.40, (Function<LivenessPolicy, Number>) LivenessPolicy::qualityMinSharpness));
     }

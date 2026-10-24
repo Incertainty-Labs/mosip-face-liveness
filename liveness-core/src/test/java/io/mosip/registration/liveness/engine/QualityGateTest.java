@@ -45,7 +45,7 @@ class QualityGateTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-        "too small (20% of width),  128, 320, 240, 0.7, 0.5, liveness.guidance.face_not_found",
+        "too small (15% of width),   96, 320, 240, 0.7, 0.5, liveness.guidance.face_not_found",
         "off-centre (centre at 85%), 256, 544, 240, 0.7, 0.5, liveness.guidance.face_not_found",
         "too dark,                  256, 320, 240, 0.7, 0.10, liveness.guidance.improve_lighting",
         "too bright,                256, 320, 240, 0.7, 0.90, liveness.guidance.improve_lighting",
@@ -65,10 +65,10 @@ class QualityGateTest {
     @DisplayName("The limits come from the policy: a lower minimum face width accepts a smaller face")
     void limitsComeFromThePolicy() {
         Map<String, String> config = new HashMap<String, String>();
-        config.put("mosip.registration.face.liveness.quality.min.face.width", "0.15");
+        config.put("mosip.registration.face.liveness.quality.min.face.width", "0.12");
         LivenessPolicy policy = LivenessConfigLoader.load(config, Workflow.RESIDENT_REGISTRATION);
 
-        assertNull(QualityGate.check(observation(1, box(128, 240), 0.7f, 0.5f), W, H, policy));
+        assertNull(QualityGate.check(observation(1, box(96, 240), 0.7f, 0.5f), W, H, policy));
     }
 
     private static FaceObservation face(int width, int centreY, float sharpness, float brightness) {
