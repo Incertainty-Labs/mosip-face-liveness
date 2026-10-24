@@ -20,9 +20,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Parity with the upstream Silent-Face-Anti-Spoofing pipeline ({@code CropImage._get_new_box}, {@code cv2.resize},
- * BGR 0-255, softmax index 1) run in Python on the same image and box. The tolerance, 0.015, covers OpenCV's
- * fixed-point resize: its pixels differ from exact bilinear by at most one grey level, which moved the probability by
- * at most 0.0093 on real face boxes.
+ * BGR 0-255, softmax index 1) run in Python on the same image and box. The resize copies OpenCV's fixed-point
+ * arithmetic, so the model sees the same pixels and the tolerance, 1e-4, only covers float differences in ONNX
+ * Runtime. Exact bilinear instead of OpenCV's rounding moved real faces by up to 0.0093 and the small crops by up to
+ * 0.024, failing both tests.
  */
 class MiniFasNetPadDetectorTest {
 
@@ -57,8 +58,26 @@ class MiniFasNetPadDetectorTest {
         FaceFrame frame = YuNetDetectorTest.frame(placed(image, canvasX, canvasY));
         FaceObservation face = FaceObservation.builder().faces(1, new Rect(x, y, w, h)).build();
 
-        assertEquals(expectedV2, v2.score(frame, face).liveProbability(), 0.015, "minifasnet_v2, " + why);
-        assertEquals(expectedV1se, v1se.score(frame, face).liveProbability(), 0.015, "minifasnet_v1se, " + why);
+        assertEquals(expectedV2, v2.score(frame, face).liveProbability(), 1e-4, "minifasnet_v2, " + why);
+        assertEquals(expectedV1se, v1se.score(frame, face).liveProbability(), 1e-4, "minifasnet_v1se, " + why);
+    }
+
+    @ParameterizedTest(name = "box {0},{1} {2}x{3}")
+    @CsvSource({
+        "100, 150, 20, 24, 0.11868, 0.21633",
+        " 95, 175, 30, 20, 0.39735, 0.73737",
+        " 90, 120, 30, 30, 0.85457, 0.38375",
+        " 70, 100, 40, 40, 0.23320, 0.98417",
+        "120, 160, 24, 30, 0.82796, 0.25067"})
+    @DisplayName("TC-ENG-PAD-01 small crops, scaled up to 80x80, match too: one grey level off would move them by 0.01"
+            + " or more")
+    void matchesUpstreamOnSmallCrops(int x, int y, int w, int h, double expectedV2, double expectedV1se)
+            throws IOException {
+        FaceFrame frame = YuNetDetectorTest.frame(YuNetDetectorTest.face());
+        FaceObservation box = FaceObservation.builder().faces(1, new Rect(x, y, w, h)).build();
+
+        assertEquals(expectedV2, v2.score(frame, box).liveProbability(), 1e-4, "minifasnet_v2");
+        assertEquals(expectedV1se, v1se.score(frame, box).liveProbability(), 1e-4, "minifasnet_v1se");
     }
 
     /** The image as is ({@code canvasX} -1), or copied at the given offset onto a 1280x720 canvas of grey 128. */

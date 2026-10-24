@@ -16,13 +16,15 @@ import java.util.Collections;
 /**
  * Passive PAD with one Silent-Face-Anti-Spoofing MiniFASNet model (Minivision, Apache-2.0), preprocessed exactly as
  * upstream: the face box is scaled around its centre ({@code CropImage._get_new_box}: the scale is capped so the box
- * fits the image, a box past an edge is shifted back, not clipped), the crop is resized to 80x80 like
- * {@code cv2.resize} INTER_LINEAR and fed as BGR 0-255; the live probability is softmax index 1. Thread-safe;
- * {@link #close()} releases the model.
+ * fits the image, a box past an edge is shifted back, not clipped), the crop is resized to 80x80 bit for bit as
+ * {@code cv2.resize} INTER_LINEAR does on 8-bit images, and fed as BGR 0-255; the live probability is softmax index 1.
+ * Thread-safe; {@link #close()} releases the model.
  */
 public final class MiniFasNetPadDetector implements PadDetector, AutoCloseable {
 
     static final int SIZE = 80;
+    /** OpenCV's INTER_RESIZE_COEF_SCALE: interpolation weights are integers out of 2048. */
+    private static final int ONE = 2048;
     private static final int REAL = 1;
 
     private final OrtEnvironment env;
@@ -132,40 +134,82 @@ public final class MiniFasNetPadDetector implements PadDetector, AutoCloseable {
         return new int[] {(int) left, (int) top, (int) right, (int) bottom};
     }
 
-    /** The inclusive crop resized to 80x80 like OpenCV INTER_LINEAR on 8-bit pixels (rounded), as BGR planes. */
+    /**
+     * The inclusive crop resized to 80x80 exactly as OpenCV 4 {@code cv2.resize} INTER_LINEAR does on 8-bit images,
+     * as BGR planes. OpenCV works in fixed point: weights out of 2048, a horizontal pass into ints, then a vertical
+     * pass with its SIMD rounding, {@code ((h0 >> 4) * b0 >> 16) + ((h1 >> 4) * b1 >> 16)}, rounded by 2 bits. The
+     * source position is clamped to the image horizontally; vertically only the rows are clamped and the weights
+     * kept. Checked against {@code cv2.resize} (4.10) on 1000 random crops: identical.
+     */
     private static float[] resizeBgr(FaceFrame frame, int left, int top, int right, int bottom) {
         int w = right - left + 1;
         int h = bottom - top + 1;
         int stride = frame.width();
         byte[] rgb = frame.rgb();
-        float sx = (float) w / SIZE;
-        float sy = (float) h / SIZE;
+        int[] xs = new int[SIZE];
+        int[] xa = new int[2 * SIZE];
+        weights(w, xs, xa, true);
+        int[] ys = new int[SIZE];
+        int[] yb = new int[2 * SIZE];
+        weights(h, ys, yb, false);
+
+        int[] horizontal = new int[h * SIZE * 3];
+        for (int y = 0; y < h; y++) {
+            int row = ((top + y) * stride + left) * 3;
+            for (int dx = 0; dx < SIZE; dx++) {
+                int i0 = row + xs[dx] * 3;
+                int o = (y * SIZE + dx) * 3;
+                for (int c = 0; c < 3; c++) {
+                    int p0 = rgb[i0 + c] & 0xFF;
+                    horizontal[o + c] = xs[dx] >= w - 1 ? p0 * ONE
+                            : p0 * xa[2 * dx] + (rgb[i0 + 3 + c] & 0xFF) * xa[2 * dx + 1];
+                }
+            }
+        }
+
         int plane = SIZE * SIZE;
         float[] out = new float[3 * plane];
         for (int dy = 0; dy < SIZE; dy++) {
-            float fy = Math.max(0f, (dy + 0.5f) * sy - 0.5f);
-            int y0 = Math.min((int) fy, h - 1);
-            int y1 = Math.min(y0 + 1, h - 1);
-            float wy = fy - y0;
+            int r0 = Math.min(Math.max(ys[dy], 0), h - 1) * SIZE * 3;
+            int r1 = Math.min(Math.max(ys[dy] + 1, 0), h - 1) * SIZE * 3;
+            int b0 = yb[2 * dy];
+            int b1 = yb[2 * dy + 1];
             for (int dx = 0; dx < SIZE; dx++) {
-                float fx = Math.max(0f, (dx + 0.5f) * sx - 0.5f);
-                int x0 = Math.min((int) fx, w - 1);
-                int x1 = Math.min(x0 + 1, w - 1);
-                float wx = fx - x0;
-                int i00 = ((top + y0) * stride + left + x0) * 3;
-                int i01 = ((top + y0) * stride + left + x1) * 3;
-                int i10 = ((top + y1) * stride + left + x0) * 3;
-                int i11 = ((top + y1) * stride + left + x1) * 3;
-                int o = dy * SIZE + dx;
                 for (int c = 0; c < 3; c++) {
-                    float upper = (1 - wx) * (rgb[i00 + c] & 0xFF) + wx * (rgb[i01 + c] & 0xFF);
-                    float lower = (1 - wx) * (rgb[i10 + c] & 0xFF) + wx * (rgb[i11 + c] & 0xFF);
+                    int k = dx * 3 + c;
+                    int v = ((horizontal[r0 + k] >> 4) * b0 >> 16) + ((horizontal[r1 + k] >> 4) * b1 >> 16);
                     // RGB channel c goes to BGR plane 2 - c
-                    out[(2 - c) * plane + o] = Math.round((1 - wy) * upper + wy * lower);
+                    out[(2 - c) * plane + dy * SIZE + dx] = Math.min(255, Math.max(0, (v + 2) >> 2));
                 }
             }
         }
         return out;
+    }
+
+    /**
+     * OpenCV's linear-resize source positions and weights for {@code src} pixels onto {@link #SIZE}: position
+     * {@code floor((d + 0.5) * scale - 0.5)} in float, weights {@code rint((1 - f) * 2048)} and {@code rint(f * 2048)}.
+     *
+     * @param clamp whether a position outside the image is clamped with its weight zeroed (OpenCV's horizontal pass)
+     */
+    private static void weights(int src, int[] pos, int[] weight, boolean clamp) {
+        double scale = 1.0 / ((double) SIZE / src);
+        for (int d = 0; d < SIZE; d++) {
+            float f = (float) ((d + 0.5) * scale - 0.5);
+            int s = (int) Math.floor(f);
+            f -= s;
+            if (clamp && s < 0) {
+                f = 0;
+                s = 0;
+            }
+            if (clamp && s >= src - 1) {
+                f = 0;
+                s = src - 1;
+            }
+            pos[d] = s;
+            weight[2 * d] = (int) Math.rint((1f - f) * ONE);
+            weight[2 * d + 1] = (int) Math.rint(f * ONE);
+        }
     }
 
     private static double[] softmax(float[] logits) {
