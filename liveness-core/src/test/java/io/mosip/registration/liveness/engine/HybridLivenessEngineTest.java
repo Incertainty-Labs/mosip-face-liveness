@@ -318,6 +318,56 @@ class HybridLivenessEngineTest {
         assertEquals(0, session.recentFrames().size());
     }
 
+    @Test
+    @DisplayName("onProgress reports the passive window filling (1/3, 2/3, 3/3), then each challenge's elapsed share"
+            + " of challenge.timeout.ms")
+    void progress() {
+        Recorder recorder = new Recorder();
+        LivenessSession session = engine(frame -> FRONTAL, 0.95, Collections.<ChallengeType>emptyList())
+                .startSession(context(), policy("challenge.timeout.ms", "2000"), recorder);
+
+        feed(session, 0, 600);
+
+        assertAll(() -> assertEquals(1f / 3, recorder.progress.get(0), 1e-6),
+                () -> assertEquals(2f / 3, recorder.progress.get(1), 1e-6),
+                () -> assertEquals(1f, recorder.progress.get(2), 1e-6),
+                () -> assertEquals(0.25f, recorder.progress.get(recorder.progress.size() - 1), 1e-6,
+                        "neutral hold from 100 ms, at 600 ms: 500 of 2000 ms"));
+    }
+
+    @Test
+    @DisplayName("The buffered frames are dropped by the engine itself on CANCELLED, ERROR and session timeout"
+            + " (API.md §3.4); a PASSED or FAILED session keeps them for the binder")
+    void framesDroppedWhenNoCaptureFollows() {
+        LivenessSession cancelled = engine(frame -> FRONTAL, 0.70, Collections.singletonList(ChallengeType.SMILE))
+                .startSession(context(), policy("mode", "HYBRID"), new Recorder());
+        feed(cancelled, 0, 300);
+        cancelled.cancel();
+
+        LivenessSession timedOut = engine(frame -> FaceObservation.builder().build(), 0.95,
+                Collections.<ChallengeType>emptyList()).startSession(context(), policy("session.timeout.ms", "10000"),
+                        new Recorder());
+        feed(timedOut, 0, 15000);
+
+        int[] calls = {0};
+        LivenessSession error = engine(frame -> {
+            if (calls[0]++ == 2) {
+                throw new IllegalStateException("inference failed");
+            }
+            return FRONTAL;
+        }, 0.95, Collections.<ChallengeType>emptyList()).startSession(context(), policy(), new Recorder());
+        feed(error, 0, 500);
+
+        LivenessSession passed = engine(frame -> FRONTAL, 0.95, Collections.<ChallengeType>emptyList())
+                .startSession(context(), policy(), new Recorder());
+        feed(passed, 0, 2000);
+
+        assertAll(() -> assertEquals(0, cancelled.recentFrames().size(), "cancelled"),
+                () -> assertEquals(0, timedOut.recentFrames().size(), "session timeout"),
+                () -> assertEquals(0, error.recentFrames().size(), "error"),
+                () -> assertEquals(5, passed.recentFrames().size(), "passed: kept for the binder"));
+    }
+
     /** A passive pass over frames whose pixels are {@link #pixels}; {@code tamper} changes one pixel of frame 5. */
     private static LivenessResult runWithFrames(int tamper) {
         Recorder recorder = new Recorder();
@@ -448,6 +498,7 @@ class HybridLivenessEngineTest {
         final List<SessionState> states = new ArrayList<SessionState>();
         final List<UserPrompt> prompts = new ArrayList<UserPrompt>();
         final List<ChallengeType> challenges = new ArrayList<ChallengeType>();
+        final List<Float> progress = new ArrayList<Float>();
         LivenessResult result;
         int results;
 
@@ -466,6 +517,7 @@ class HybridLivenessEngineTest {
 
         @Override
         public void onProgress(float fraction) {
+            progress.add(fraction);
         }
 
         @Override

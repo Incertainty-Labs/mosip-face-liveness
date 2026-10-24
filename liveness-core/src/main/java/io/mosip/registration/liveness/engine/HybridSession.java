@@ -122,6 +122,8 @@ final class HybridSession implements LivenessSession {
         }
         lastMs = now;
         if (now - firstMs >= policy.sessionTimeoutMs()) {
+            // No capture follows a session that ran out of time, so its frames are dropped now (API.md §3.4)
+            recent.clear();
             finish(SessionState.FAILED, Decision.INCONCLUSIVE, LivenessErrorCode.CHALLENGE_TIMEOUT, now);
             return;
         }
@@ -186,6 +188,7 @@ final class HybridSession implements LivenessSession {
             enter(SessionState.PASSIVE_CHECK, new UserPrompt("liveness.status.checking", PromptLevel.INFO));
         }
         passiveFrames.add(observation);
+        callback.onProgress(Math.min(1f, (float) passiveFrames.size() / policy.passiveMinFrames()));
         double score = assessor.score();
         if (Double.isNaN(score)) {
             return;
@@ -221,6 +224,8 @@ final class HybridSession implements LivenessSession {
     }
 
     private void challengeStep(FaceObservation observation, long now) {
+        // The step's countdown: how much of the challenge's time is used
+        callback.onProgress(Math.min(1f, (float) (now - challengeStartMs) / challenge.timeoutMs()));
         ChallengeProgress progress = verifier.update(challenge, observation, now);
         if (progress == ChallengeProgress.TIMED_OUT) {
             outcomes.add(new ChallengeOutcome(challenge.type(), progress, now - challengeStartMs));
@@ -243,6 +248,10 @@ final class HybridSession implements LivenessSession {
     private void finish(SessionState finalState, Decision decision, LivenessErrorCode error, long now) {
         finished = true;
         state = finalState;
+        if (finalState == SessionState.CANCELLED || finalState == SessionState.ERROR) {
+            // No capture follows, so the frames are not kept for a binder (API.md §3.4)
+            recent.clear();
+        }
         long duration = firstMs < 0 ? 0 : now - firstMs;
         LivenessResult result = LivenessResult.builder(finalState, decision)
                 .passiveScore(Double.isNaN(passiveScore) ? 0.0 : passiveScore)

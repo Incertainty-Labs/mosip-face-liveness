@@ -25,6 +25,10 @@
             <artifactId>liveness-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.mosip.registration.liveness</groupId>
+            <artifactId>liveness-desktop</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.microsoft.onnxruntime</groupId>
             <artifactId>onnxruntime</artifactId>
         </dependency>
