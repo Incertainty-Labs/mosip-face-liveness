@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-25
+
+The Desktop capture binder, and options for slow devices: the first Android build of the real engine was too slow for the challenges.
+
 ### Added
 
 - `liveness-core`: `GeometricCaptureBinder` (package `binding`), the Desktop capture binder (TECHNICAL_DESIGN §8): the signed capture must show the scene the session just saw, from the same camera. The capture is compared with each of the session's last frames and the best pair counts, scored as the mean of face box overlap (coordinates scaled to 0..1, since resolutions may differ), landmark agreement (five points, the capture's scaled to the stream frame's size, relative to the eye distance) and a 64-bit perceptual hash of the face crop; bound at `bind.min.similarity` (0.60). The capture must be the camera's whole frame, at any resolution. Recent frames that cannot be compared (not exactly one face, a landmark that is not a number, a box almost outside the frame) are skipped. Never bound when liveness did not pass, no recent frame can be compared, or the capture does not show exactly one face that can be compared. The evidence digest becomes SHA-256 over the session's digest and the SHA-256 of the capture's decoded pixels. On test faces: the same scene 1.0, drifted 8 px 0.78 (0.78 too when the capture has twice the stream's resolution), another person where the face was 0.29. It proves the scene, not identity.
