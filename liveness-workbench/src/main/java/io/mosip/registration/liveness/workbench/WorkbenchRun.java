@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 
 /**
@@ -62,7 +63,8 @@ public final class WorkbenchRun {
     private final OverlayModel overlay;
     private final Map<Workflow, AttemptTracker> trackers = new EnumMap<Workflow, AttemptTracker>(Workflow.class);
     private volatile LivenessSession session;
-    private volatile FrameSource source;
+    /** One check at a time: a second would open a second stream on the same device. */
+    private final AtomicBoolean running = new AtomicBoolean();
 
     /**
      * @param engine          the liveness engine
@@ -84,7 +86,7 @@ public final class WorkbenchRun {
     }
 
     /**
-     * Starts a check, unless the workflow's attempts are used up (LIV-011).
+     * Starts a check, unless one is running or the workflow's attempts are used up (LIV-011).
      *
      * @param workflow       the workflow to check
      * @param policy         its policy
@@ -92,6 +94,10 @@ public final class WorkbenchRun {
      * @param frames         the frame source; it is started here and stopped when the attempt ends
      */
     public void start(Workflow workflow, LivenessPolicy policy, boolean modeOverridden, FrameSource frames) {
+        if (!running.compareAndSet(false, true)) {
+            ui.audit("A check is already running; Cancel it first");
+            return;
+        }
         AttemptTracker tracker = tracker(workflow, policy);
         ui.audit("Start " + workflow + ": mode " + policy.mode() + (modeOverridden ? " (mode overridden in the"
                 + " Workbench)" : "") + ", attempt " + tracker.current() + " of " + tracker.limit() + ", source "
@@ -103,12 +109,12 @@ public final class WorkbenchRun {
             ui.audit("No attempt left (LIV-011); Reset starts the count again");
             overlay.failed(LivenessErrorCode.MAX_RETRIES_EXCEEDED, tracker.limit(), tracker.limit(), false,
                     policy.onMaxRetries());
+            running.set(false);
             return;
         }
         overlay.searching();
-        source = frames;
         LivenessSession started = engine.startSession(LivenessContext.builder().workflow(workflow)
-                .source(frames.capabilities()).build(), policy, new Callback(workflow, policy, tracker));
+                .source(frames.capabilities()).build(), policy, new Callback(workflow, policy, tracker, frames));
         session = started;
         try {
             frames.start(new FrameListener() {
@@ -167,23 +173,30 @@ public final class WorkbenchRun {
         return t;
     }
 
-    private void stopSource() {
-        FrameSource s = source;
-        if (s != null) {
-            s.stop();
-        }
-    }
-
     /** The engine's events, on its worker thread. */
     private final class Callback implements LivenessCallback {
         private final Workflow workflow;
         private final LivenessPolicy policy;
         private final AttemptTracker tracker;
+        private final FrameSource frames;
 
-        Callback(Workflow workflow, LivenessPolicy policy, AttemptTracker tracker) {
+        Callback(Workflow workflow, LivenessPolicy policy, AttemptTracker tracker, FrameSource frames) {
             this.workflow = workflow;
             this.policy = policy;
             this.tracker = tracker;
+            this.frames = frames;
+        }
+
+        /** This check's own stream, whatever started since. */
+        private void stopSource() {
+            frames.stop();
+        }
+
+        /** The attempt is over: the next Start may run. */
+        private void ended(ResultCard card) {
+            stopSource();
+            running.set(false);
+            ui.result(card);
         }
 
         @Override
@@ -194,7 +207,7 @@ public final class WorkbenchRun {
 
         @Override
         public void onChallenge(Challenge challenge, int index, int total) {
-            ui.audit("Challenge " + (index + 1) + " of " + total + ": " + challenge.type());
+            ui.audit("Challenge " + index + " of " + total + ": " + challenge.type());
             overlay.challenge(challenge, index, total);
         }
 
@@ -211,6 +224,8 @@ public final class WorkbenchRun {
             switch (result.finalState()) {
                 case PASSED:
                     long passedAt = wallClock.getAsLong();
+                    // The stream stays open: MockMDS refuses a capture once its stream has stopped (error 700), and
+                    // ends the stream itself when it captures; the capturer tells the source to expect that end
                     overlay.capturing();
                     captureExecutor.execute(() -> capture(result, passedAt));
                     return;
@@ -225,8 +240,7 @@ public final class WorkbenchRun {
                     failed(result);
                     break;
             }
-            stopSource();
-            ui.result(new ResultCard(workflow.name(), result, null));
+            ended(new ResultCard(workflow.name(), result, null));
         }
 
         private void capture(LivenessResult result, long passedAt) {
@@ -236,21 +250,18 @@ public final class WorkbenchRun {
                 if (signed == null) {
                     // A recorded clip: liveness is all there is to show
                     ui.audit("Passed; no device capture (the source is a clip)");
-                    stopSource();
                     overlay.succeeded();
-                    ui.result(new ResultCard(workflow.name(), result, null));
+                    ended(new ResultCard(workflow.name(), result, null));
                     return;
                 }
                 outcome = check.check(result, signed, passedAt, policy, session.recentFrames());
-            } catch (IOException e) {
+            } catch (IOException | RuntimeException e) {
                 ui.audit("Capture failed: " + e.getMessage());
-                stopSource();
                 overlay.failed(LivenessErrorCode.DEVICE_CONNECTION_FAILED, tracker.current(), tracker.limit(), true,
                         policy.onMaxRetries());
-                ui.result(new ResultCard(workflow.name(), result, null));
+                ended(new ResultCard(workflow.name(), result, null));
                 return;
             }
-            stopSource();
             if (outcome.bound()) {
                 ui.audit("Capture bound: signature valid, nonce echoed, signed in time"
                         + (outcome.binding() == null ? ", scene check off" : ", scene similarity "
@@ -261,7 +272,7 @@ public final class WorkbenchRun {
                 failed(LivenessResult.builder(SessionState.FAILED, Decision.ATTACK_SUSPECTED)
                         .errorCode(outcome.errorCode()).build());
             }
-            ui.result(new ResultCard(workflow.name(), result, outcome));
+            ended(new ResultCard(workflow.name(), result, outcome));
         }
 
         /** An attempt that ended in failure: counted by the clients' rules, then shown with what is left. */

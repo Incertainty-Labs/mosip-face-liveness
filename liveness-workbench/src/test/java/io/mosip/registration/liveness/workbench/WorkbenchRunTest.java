@@ -125,6 +125,72 @@ class WorkbenchRunTest {
     }
 
     @Test
+    @DisplayName("The stream stays open during the device capture, since MockMDS refuses a capture once its stream has"
+            + " stopped (error 700), and is stopped after it")
+    void streamOpenDuringCapture() {
+        Ui ui = new Ui();
+        Source source = new Source();
+        boolean[] stoppedAtCapture = {true};
+        WorkbenchRun run = run("PASS_PASSIVE", ui, nonce -> {
+            stoppedAtCapture[0] = source.stopped;
+            return fresh(nonce);
+        });
+
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, source);
+
+        assertAll(() -> assertFalse(stoppedAtCapture[0], "still open at the capture"),
+                () -> assertTrue(source.stopped, "stopped after"),
+                () -> assertEquals(UiState.SUCCESS, ui.last().state()));
+    }
+
+    @Test
+    @DisplayName("Start while a check is running does nothing but say so: a second check would open a second stream,"
+            + " and the first one's stream would never be stopped; after a cancel, Start works again")
+    void oneCheckAtATime() {
+        Ui ui = new Ui();
+        WorkbenchRun run = run("PASS_PASSIVE", ui, nonce -> fresh(nonce));
+        Silent first = new Silent();
+        Silent second = new Silent();
+        Silent third = new Silent();
+
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, first);
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, second);
+        run.cancel();
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, third);
+
+        assertAll(() -> assertTrue(first.started), () -> assertFalse(second.started, "refused while running"),
+                () -> assertTrue(ui.audited("already running")),
+                () -> assertTrue(first.stopped, "the cancelled check stops its own stream"),
+                () -> assertTrue(third.started, "Start works again after the cancel"));
+    }
+
+    /** Starts but sends no frame, so its check stays in progress. */
+    static final class Silent implements FrameSource {
+        volatile boolean started;
+        volatile boolean stopped;
+
+        @Override
+        public String id() {
+            return "silent";
+        }
+
+        @Override
+        public SourceCapabilities capabilities() {
+            return SourceCapabilities.builder().build();
+        }
+
+        @Override
+        public void start(FrameListener listener) {
+            started = true;
+        }
+
+        @Override
+        public void stop() {
+            stopped = true;
+        }
+    }
+
+    @Test
     @DisplayName("Close or Next after a result returns the overlay to idle")
     void clear() {
         Ui ui = new Ui();

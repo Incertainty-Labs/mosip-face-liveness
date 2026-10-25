@@ -7,6 +7,7 @@ import io.mosip.registration.liveness.api.PadDetector;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +33,7 @@ public final class PassiveAssessor {
     /** Each weighted cue's own live probabilities over the same window, for {@link #cues()}. */
     private final List<Deque<Double>> cueWindows = new ArrayList<Deque<Double>>();
     private String vetoedBy;
+    private Map<String, Double> lastScores = Collections.emptyMap();
 
     /**
      * @param detectors the loaded cues
@@ -85,6 +87,7 @@ public final class PassiveAssessor {
      * @return this frame's fused live score, or NaN when not scored
      */
     public double add(FaceFrame frame, FaceObservation observation, boolean score) {
+        lastScores = Collections.emptyMap();
         for (PadDetector detector : vetoOnly) {
             if (detector.score(frame, observation).veto() && vetoedBy == null) {
                 vetoedBy = detector.name();
@@ -94,13 +97,21 @@ public final class PassiveAssessor {
             return Double.NaN;
         }
         double fused = 0;
+        Map<String, Double> scores = new LinkedHashMap<String, Double>();
         for (int i = 0; i < weighted.size(); i++) {
             double live = weighted.get(i).score(frame, observation).liveProbability();
             push(cueWindows.get(i), live);
             fused += weights.get(i) * live;
+            scores.put(weighted.get(i).name(), live);
         }
+        lastScores = Collections.unmodifiableMap(scores);
         push(window, fused);
         return fused;
+    }
+
+    /** @return each weighted cue's live probability on the last frame added, by name; empty when it was not scored */
+    public Map<String, Double> lastScores() {
+        return lastScores;
     }
 
     /** @return each weighted cue's median over the window, by name; diagnostics and audit only; empty before any */

@@ -56,8 +56,8 @@ class LivenessOverlayTest {
         List<OverlayView> views = new ArrayList<OverlayView>();
         OverlayModel model = new OverlayModel(views::add);
         model.state(SessionState.ACTIVE_CHALLENGE, new UserPrompt("liveness.prompt.turn_left", PromptLevel.INFO));
-        model.challenge(new Challenge(ChallengeType.TURN_LEFT, 5000), 0, 3);
-        model.challenge(new Challenge(ChallengeType.TURN_RIGHT, 5000), 1, 3);
+        model.challenge(new Challenge(ChallengeType.TURN_LEFT, 5000), 1, 3);
+        model.challenge(new Challenge(ChallengeType.TURN_RIGHT, 5000), 2, 3);
         model.progress(0.25f);
 
         LivenessOverlay overlay = onFx(() -> {

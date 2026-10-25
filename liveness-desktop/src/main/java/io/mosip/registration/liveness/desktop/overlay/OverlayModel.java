@@ -1,7 +1,6 @@
 package io.mosip.registration.liveness.desktop.overlay;
 
 import io.mosip.registration.liveness.api.Challenge;
-import io.mosip.registration.liveness.api.ChallengeType;
 import io.mosip.registration.liveness.api.ErrorCategory;
 import io.mosip.registration.liveness.api.LivenessErrorCode;
 import io.mosip.registration.liveness.api.MaxRetriesAction;
@@ -68,11 +67,24 @@ public final class OverlayModel {
                 b.ring = 0f;
                 break;
             case ACTIVE_CHALLENGE:
-            case NEUTRAL_HOLD:
-                b.state = state == SessionState.NEUTRAL_HOLD ? UiState.NEUTRAL_HOLD : UiState.CHALLENGE;
+                b.state = UiState.CHALLENGE;
                 b.level = Level.INFO;
                 b.promptKey = prompt == null ? b.promptKey : prompt.key();
                 b.ring = Float.NaN;
+                break;
+            case NEUTRAL_HOLD:
+                // No onChallenge comes for the hold: its state starts it, with its whole time; after challenges the
+                // step line stays and the last one is reported done
+                b.state = UiState.NEUTRAL_HOLD;
+                b.level = Level.INFO;
+                b.promptKey = prompt == null ? "liveness.prompt.neutral" : prompt.key();
+                b.cue = Cue.NONE;
+                b.ring = Float.NaN;
+                b.timeLeft = 1f;
+                if (b.stepTotal > 0) {
+                    b.toastKey = "liveness.feedback.detected";
+                    b.toastSequence++;
+                }
                 break;
             default:
                 return;
@@ -82,24 +94,22 @@ public final class OverlayModel {
     }
 
     /**
-     * The engine's {@code onChallenge}: a new step starts with its whole time; any step after the first means the last
-     * one was done (S6). The step dots appear only when there is more than the neutral hold.
+     * The engine's {@code onChallenge}, for a random challenge (never the neutral hold): it starts with its whole time;
+     * any challenge after the first means the last one was done (S6).
      *
-     * @param challenge the step
-     * @param index     0-based
-     * @param total     steps in the session
+     * @param challenge the challenge
+     * @param index     1-based among the random challenges
+     * @param total     random challenges in the session
      */
     public synchronized void challenge(Challenge challenge, int index, int total) {
-        b.state = challenge.type() == ChallengeType.NEUTRAL_HOLD ? UiState.NEUTRAL_HOLD : UiState.CHALLENGE;
+        b.state = UiState.CHALLENGE;
         b.promptKey = challenge.promptKey();
         b.cue = Cue.of(challenge.type());
         b.timeLeft = 1f;
-        if (total > 1) {
-            b.stepTotal = total;
-            b.statusKey = "liveness.progress.step";
-            b.statusArgs = new Object[] {index + 1, total};
-        }
-        if (index > 0) {
+        b.stepTotal = total;
+        b.statusKey = "liveness.progress.step";
+        b.statusArgs = new Object[] {index, total};
+        if (index > 1) {
             b.toastKey = "liveness.feedback.detected";
             b.toastSequence++;
         }

@@ -44,7 +44,6 @@ class OverlayModelTest {
         model.progress(0.5f);
         OverlayView s4 = last();
         model.state(SessionState.NEUTRAL_HOLD, new UserPrompt("liveness.prompt.neutral", PromptLevel.INFO));
-        model.challenge(new Challenge(ChallengeType.NEUTRAL_HOLD, 5000), 0, 1);
         model.progress(0.2f);
         OverlayView s7 = last();
         model.capturing();
@@ -63,6 +62,7 @@ class OverlayModelTest {
                 () -> assertView(s7, UiState.NEUTRAL_HOLD, "liveness.status.checking", "liveness.prompt.neutral",
                         Action.CANCEL),
                 () -> assertEquals(0, s7.stepTotal(), "no step dots for the hold alone"),
+                () -> assertEquals(null, s7.toastKey(), "nothing was detected"),
                 () -> assertEquals(0.8f, s7.timeLeft(), 1e-6),
                 () -> assertView(s8, UiState.CAPTURING, "liveness.feedback.hold_still", null),
                 () -> assertView(s9, UiState.SUCCESS, "liveness.feedback.success", null, Action.NEXT),
@@ -70,33 +70,39 @@ class OverlayModelTest {
     }
 
     @Test
-    @DisplayName("S5 to S7: each challenge shows Step i of n, its prompt and direction cue, and a time bar; a new step"
-            + " says the last one was detected (S6); the neutral hold is the last step")
+    @DisplayName("S5 to S7: each challenge shows Step i of n (the callback's 1-based index among the random"
+            + " challenges), its prompt and direction cue, and a time bar; a new step says the last one was detected"
+            + " (S6); the neutral hold, announced by its state alone, says so for the last challenge and keeps the"
+            + " step line")
     void challengeFlow() {
         model.state(SessionState.ACTIVE_CHALLENGE, new UserPrompt("liveness.prompt.turn_left", PromptLevel.INFO));
-        model.challenge(new Challenge(ChallengeType.TURN_LEFT, 5000), 0, 3);
+        model.challenge(new Challenge(ChallengeType.TURN_LEFT, 5000), 1, 2);
         model.progress(0.25f);
         OverlayView first = last();
-        model.challenge(new Challenge(ChallengeType.SMILE, 5000), 1, 3);
+        model.state(SessionState.ACTIVE_CHALLENGE, new UserPrompt("liveness.prompt.smile", PromptLevel.INFO));
+        model.challenge(new Challenge(ChallengeType.SMILE, 5000), 2, 2);
         OverlayView second = last();
         model.state(SessionState.NEUTRAL_HOLD, new UserPrompt("liveness.prompt.neutral", PromptLevel.INFO));
-        model.challenge(new Challenge(ChallengeType.NEUTRAL_HOLD, 5000), 2, 3);
         OverlayView hold = last();
 
         assertAll(() -> assertView(first, UiState.CHALLENGE, "liveness.progress.step", "liveness.prompt.turn_left",
                         Action.CANCEL),
-                () -> assertArrayEquals(new Object[] {1, 3}, first.statusArgs()),
+                () -> assertArrayEquals(new Object[] {1, 2}, first.statusArgs()),
+                () -> assertEquals(2, first.stepTotal()),
                 () -> assertEquals(Cue.LEFT, first.cue()),
                 () -> assertEquals(0.75f, first.timeLeft(), 1e-6),
                 () -> assertNull(first.toastKey(), "nothing detected yet"),
-                () -> assertArrayEquals(new Object[] {2, 3}, second.statusArgs()),
+                () -> assertArrayEquals(new Object[] {2, 2}, second.statusArgs()),
                 () -> assertEquals(Cue.SMILE, second.cue()),
                 () -> assertEquals("liveness.feedback.detected", second.toastKey()),
                 () -> assertEquals(1f, second.timeLeft(), 1e-6, "a new step has its whole time"),
                 () -> assertView(hold, UiState.NEUTRAL_HOLD, "liveness.progress.step", "liveness.prompt.neutral",
                         Action.CANCEL),
-                () -> assertArrayEquals(new Object[] {3, 3}, hold.statusArgs()),
-                () -> assertEquals(Cue.NONE, hold.cue()));
+                () -> assertArrayEquals(new Object[] {2, 2}, hold.statusArgs()),
+                () -> assertEquals(Cue.NONE, hold.cue()),
+                () -> assertEquals(1f, hold.timeLeft(), 1e-6, "the hold has its whole time"),
+                () -> assertEquals("liveness.feedback.detected", hold.toastKey(), "the last challenge was done"),
+                () -> assertTrue(hold.toastSequence() > second.toastSequence(), "a new toast"));
     }
 
     @ParameterizedTest(name = "{0}")

@@ -3,6 +3,7 @@ package io.mosip.registration.liveness.engine;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.mosip.registration.liveness.api.AnalysedFrame;
 import io.mosip.registration.liveness.api.Challenge;
@@ -87,10 +88,34 @@ class HybridLivenessEngineTest {
         LivenessResult r = recorder.result;
         assertAll(() -> assertEquals(Arrays.asList(SessionState.WAITING_FOR_FACE, SessionState.PASSIVE_CHECK,
                         SessionState.ACTIVE_CHALLENGE, SessionState.NEUTRAL_HOLD, SessionState.PASSED), recorder.states),
-                () -> assertEquals(Arrays.asList(ChallengeType.SMILE, ChallengeType.NEUTRAL_HOLD), recorder.challenges),
+                () -> assertEquals(Arrays.asList(ChallengeType.SMILE), recorder.challenges),
                 () -> assertEquals(Decision.LIVE, r.decision()),
                 () -> assertEquals(true, r.activeUsed()),
                 () -> assertEquals("SMILE:PASSED,NEUTRAL_HOLD:PASSED", r.challengeSummary()));
+    }
+
+    @Test
+    @DisplayName("onChallenge follows its contract: a 1-based index among the random challenges, their count as the"
+            + " total, and no call for the final neutral hold, so a client shows Step 1 of 2, Step 2 of 2; a passive"
+            + " pass announces no challenge")
+    void challengesAreNumberedFromOne() {
+        Recorder active = new Recorder();
+        LivenessSession challenged = engine(frame -> frame.timestampMs() >= 400 && frame.timestampMs() < 1000
+                ? face(0, 10, 2, 0.8f, 0f, 0.8f) : frame.timestampMs() >= 1300 && frame.timestampMs() < 2000
+                        ? face(0, 10, 2, 0f, 0.6f, 0.8f) : FRONTAL, 0.95,
+                Arrays.asList(ChallengeType.SMILE, ChallengeType.OPEN_MOUTH))
+                .startSession(context(), policy("mode", "ACTIVE"), active);
+        Recorder passive = new Recorder();
+        LivenessSession quiet = engine(frame -> FRONTAL, 0.95, Collections.<ChallengeType>emptyList())
+                .startSession(context(), policy(), passive);
+
+        feed(challenged, 0, 6000);
+        feed(quiet, 0, 2000);
+
+        assertAll(() -> assertEquals(SessionState.PASSED, active.result.finalState()),
+                () -> assertEquals(Arrays.asList("SMILE 1/2", "OPEN_MOUTH 2/2"), active.steps),
+                () -> assertEquals(SessionState.PASSED, passive.result.finalState()),
+                () -> assertEquals(Collections.emptyList(), passive.steps));
     }
 
     @ParameterizedTest(name = "{0}={1}, {2}={3}")
@@ -119,7 +144,7 @@ class HybridLivenessEngineTest {
 
         feed(session, 0, 4000);
 
-        assertAll(() -> assertEquals(Arrays.asList(ChallengeType.SMILE, ChallengeType.NEUTRAL_HOLD), recorder.challenges),
+        assertAll(() -> assertEquals(Arrays.asList(ChallengeType.SMILE), recorder.challenges),
                 () -> assertEquals(true, recorder.result.activeUsed()),
                 () -> assertEquals(SessionState.PASSED, recorder.result.finalState()));
     }
@@ -436,6 +461,33 @@ class HybridLivenessEngineTest {
     }
 
     @Test
+    @DisplayName("onFrameAnalysed reports every analysed frame's observation, with each PAD model's score on the frames"
+            + " PAD ran on (detection frames) and none on the others; a callback that throws there never changes the"
+            + " result")
+    void frameAnalysedDiagnostics() {
+        Recorder recorder = new Recorder();
+        LivenessSession session = everyFourth(false).startSession(context(), policy(), recorder);
+        Recorder throwing = new Recorder() {
+            @Override
+            public void onFrameAnalysed(FaceObservation observation, java.util.Map<String, Double> scores) {
+                throw new IllegalStateException("a broken diagnostics panel");
+            }
+        };
+        LivenessSession robust = everyFourth(false).startSession(context(), policy(), throwing);
+
+        feed(session, 0, 3000);
+        feed(robust, 0, 3000);
+
+        assertAll(() -> assertEquals(recorder.result.framesAnalysed(), recorder.frameScores.size(),
+                        "one report per analysed frame"),
+                () -> assertEquals(java.util.Collections.singletonMap("minifasnet_v2", 0.95),
+                        recorder.frameScores.get(0), "frame 0: a detection frame"),
+                () -> assertTrue(recorder.frameScores.get(1).isEmpty(), "frame 1: followed, PAD did not run"),
+                () -> assertEquals(Integer.valueOf(1), recorder.frameFaces.get(0)),
+                () -> assertEquals(SessionState.PASSED, throwing.result.finalState()));
+    }
+
+    @Test
     @DisplayName("With an analyzer that detects every 4th frame, a session passes only on a detection frame: a second"
             + " face that arrives after the last challenge was done, before the next detection, still fails (LIV-005)")
     void passConfirmedOnDetectionFrame() {
@@ -604,10 +656,13 @@ class HybridLivenessEngineTest {
     }
 
     /** Records what the session reported. */
-    static final class Recorder implements LivenessCallback {
+    static class Recorder implements LivenessCallback {
         final List<SessionState> states = new ArrayList<SessionState>();
         final List<UserPrompt> prompts = new ArrayList<UserPrompt>();
         final List<ChallengeType> challenges = new ArrayList<ChallengeType>();
+        final List<String> steps = new ArrayList<String>();
+        final List<java.util.Map<String, Double>> frameScores = new ArrayList<java.util.Map<String, Double>>();
+        final List<Integer> frameFaces = new ArrayList<Integer>();
         final List<Float> progress = new ArrayList<Float>();
         LivenessResult result;
         int results;
@@ -623,6 +678,13 @@ class HybridLivenessEngineTest {
         @Override
         public void onChallenge(Challenge challenge, int index, int total) {
             challenges.add(challenge.type());
+            steps.add(challenge.type() + " " + index + "/" + total);
+        }
+
+        @Override
+        public void onFrameAnalysed(FaceObservation observation, java.util.Map<String, Double> scores) {
+            frameFaces.add(observation.faceCount());
+            frameScores.add(scores);
         }
 
         @Override

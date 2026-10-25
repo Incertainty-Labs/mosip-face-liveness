@@ -36,4 +36,16 @@ public interface LivenessCallback {
      * @param result the outcome
      */
     void onResult(LivenessResult result);
+
+    /**
+     * After each analysed frame, for a diagnostics panel (v0.2.2); never for the user, and nothing to implement
+     * otherwise. Called on the engine's thread before the session acts on the frame; an exception thrown here is
+     * ignored, so diagnostics can never change a result.
+     *
+     * @param observation what the face analyzer saw on the frame (no pixels)
+     * @param scores      each PAD model's live probability on this frame, by name; empty on frames the PAD models did
+     *                    not run on (no detector box, or the quality gate turned the frame away)
+     */
+    default void onFrameAnalysed(FaceObservation observation, java.util.Map<String, Double> scores) {
+    }
 }

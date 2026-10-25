@@ -39,6 +39,8 @@ public final class MjpegFrameSource implements FrameSource {
     private final FpsMeter fps = new FpsMeter(FPS_WINDOW_MS);
 
     private volatile boolean running;
+    /** The device is about to end the stream itself, as MockMDS does when it captures. */
+    private volatile boolean endExpected;
     private volatile Socket socket;
     private Thread reader;
     private long sequence;
@@ -82,9 +84,19 @@ public final class MjpegFrameSource implements FrameSource {
         }
         MjpegPartReader parts = openStream();
         running = true;
+        endExpected = false;
         reader = new Thread(() -> read(parts, listener), "mjpeg-" + id());
         reader.setDaemon(true);
         reader.start();
+    }
+
+    /**
+     * The device is about to end the stream, for example because a capture is requested (MockMDS ends its stream when
+     * it captures). The next drop then ends the stream quietly, with {@code onEnd} and no reconnect: a reconnect would
+     * open a new stream and keep the device busy.
+     */
+    public void endExpected() {
+        endExpected = true;
     }
 
     @Override
@@ -115,6 +127,12 @@ public final class MjpegFrameSource implements FrameSource {
                 continue;
             }
             if (!running) {
+                return;
+            }
+            if (endExpected) {
+                running = false;
+                closeSocket();
+                listener.onEnd();
                 return;
             }
             if (!reconnected) {

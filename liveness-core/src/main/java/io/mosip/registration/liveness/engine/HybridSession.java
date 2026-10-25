@@ -148,6 +148,11 @@ final class HybridSession implements LivenessSession {
             finish(SessionState.ERROR, Decision.INCONCLUSIVE, LivenessErrorCode.ENGINE_ERROR, now);
             return;
         }
+        try {
+            callback.onFrameAnalysed(observation, assessor.lastScores());
+        } catch (RuntimeException e) {
+            // Diagnostics are for a panel only; they never change a result
+        }
         if (assessor.veto() != null) {
             // A hard veto (a frozen stream) ends the attempt in any state
             finish(SessionState.FAILED, Decision.ATTACK_SUSPECTED, StaticStreamDetector.NAME.equals(assessor.veto())
@@ -234,7 +239,11 @@ final class HybridSession implements LivenessSession {
         SessionState next = challenge.type() == ChallengeType.NEUTRAL_HOLD ? SessionState.NEUTRAL_HOLD
                 : SessionState.ACTIVE_CHALLENGE;
         enter(next, new UserPrompt(challenge.promptKey(), PromptLevel.INFO));
-        callback.onChallenge(challenge, index, sequence.size());
+        if (challenge.type() != ChallengeType.NEUTRAL_HOLD) {
+            // The callback's contract: 1-based among the random challenges; the hold that ends every sequence is not
+            // one of them and is announced by its state alone
+            callback.onChallenge(challenge, index + 1, sequence.size() - 1);
+        }
     }
 
     private void challengeStep(FaceObservation observation, boolean detected, long now) {

@@ -125,13 +125,18 @@ class ChallengeVerifiersTest {
     }
 
     @Test
-    @DisplayName("NEUTRAL_HOLD passes after 1 s within 5° of the baseline (the camera's own 11.5° pitch included),"
-            + " eyes open, mouth closed; 8° off or an open mouth never passes")
+    @DisplayName("NEUTRAL_HOLD passes after 1 s within 10° of the baseline (the camera's own 11.5° pitch included),"
+            + " eyes open, mouth closed: after a challenge a real face settled 4 to 7° from a baseline the short"
+            + " passive window had taken, and 5° failed it every time on the Workbench; a head still 12° turned or"
+            + " 15° up, or an open mouth, never passes")
     void neutralHold() {
         Challenge challenge = new Challenge(ChallengeType.NEUTRAL_HOLD, 5000);
 
         assertEquals(1000L, passTime(challenge, face(-3.7f + 3, 11.5f - 3, 3.5f + 2, 0f, 0.05f, 0.80f)));
-        assertEquals(-1L, passTime(challenge, face(-3.7f, 11.5f + 8, 3.5f, 0f, 0f, 0.81f)), "pitch 8° off");
+        assertEquals(1000L, passTime(challenge, face(-3.7f + 1, 11.5f - 7, 3.5f, 0f, 0f, 0.80f)),
+                "settled 7° below the baseline");
+        assertEquals(-1L, passTime(challenge, face(-3.7f + 12, 11.5f, 3.5f, 0f, 0f, 0.81f)), "yaw 12° off");
+        assertEquals(-1L, passTime(challenge, face(-3.7f, 11.5f + 15, 3.5f, 0f, 0f, 0.81f)), "pitch 15° off");
         assertEquals(-1L, passTime(challenge, face(-3.7f, 11.5f, 3.5f, 0.59f, 0.47f, 0.72f)), "mouth open");
     }
 

@@ -42,8 +42,12 @@ public final class ChallengeVerifiers {
     static final long BLINK_WINDOW_MS = 600;
     /** BLINK: closed for at least this many frames. */
     static final int BLINK_MIN_CLOSED_FRAMES = 2;
-    /** NEUTRAL_HOLD: yaw, pitch and roll within this of the baseline. */
-    static final double NEUTRAL_DEG = 5;
+    /**
+     * NEUTRAL_HOLD: yaw, pitch and roll within this of the baseline. People do not come back to the exact pose they
+     * started in: after a challenge a real face settled 4 to 7° away (pitch, mostly after LOOK_UP), and the short
+     * passive window can catch a head already moving, so 5° failed real faces on the Workbench.
+     */
+    static final double NEUTRAL_DEG = 10;
     /** Hold for NEUTRAL_HOLD. */
     static final long NEUTRAL_HOLD_MS = 1000;
 

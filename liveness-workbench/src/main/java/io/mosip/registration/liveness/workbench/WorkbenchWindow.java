@@ -395,9 +395,13 @@ public final class WorkbenchWindow extends BorderPane {
             SourceCapabilities caps = SourceCapabilities.builder().device("MOSIP", "MockMDS face")
                     .certification(face.certification()).fps(20, 0)
                     .formats(new java.util.HashSet<String>(Arrays.asList("image/jpeg"))).build();
-            FrameSource frames = new MjpegFrameSource(choice.host, choice.port, face.deviceId(), 0, caps);
+            MjpegFrameSource frames = new MjpegFrameSource(choice.host, choice.port, face.deviceId(), 0, caps);
             String deviceId = face.deviceId();
-            return new Opened(frames, nonce -> SignedCapture.parse(sbi.capture(deviceId, nonce, 10000)),
+            return new Opened(frames, nonce -> {
+                // MockMDS ends its stream when it captures: that end must not be taken for a drop and reconnected
+                frames.endExpected();
+                return SignedCapture.parse(sbi.capture(deviceId, nonce, 10000));
+            },
                     "MockMDS " + choice.host + ":" + choice.port + ", face device " + deviceId + " ("
                             + face.status() + ", " + face.certification() + "), profile "
                             + (choice.profile.isEmpty() ? "unchanged" : choice.profile));

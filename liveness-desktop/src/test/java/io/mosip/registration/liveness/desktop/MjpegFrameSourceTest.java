@@ -171,6 +171,28 @@ class MjpegFrameSourceTest {
     }
 
     @Test
+    @DisplayName("Once the end is expected (MockMDS ends its stream when it captures), a drop ends the stream quietly:"
+            + " no reconnect, which would keep the device busy, and no error")
+    void expectedEndDoesNotReconnect() throws Exception {
+        FakeSbi sbi = new FakeSbi(connection -> {
+            writeHeader(connection);
+            writePart(connection, jpeg(8));
+            pause(300);
+            connection.close();
+        });
+        RecordingListener listener = new RecordingListener();
+        source = new MjpegFrameSource("127.0.0.1", sbi.port(), "3", 0, DEVICE);
+        source.start(listener);
+        listener.frames(1);
+
+        source.endExpected();
+
+        assertTrue(listener.ended.await(5, TimeUnit.SECONDS), "onEnd was not called");
+        assertAll(() -> assertEquals(1, sbi.connections(), "no reconnect"),
+                () -> assertTrue(listener.errors().isEmpty(), "errors: " + listener.errors()));
+    }
+
+    @Test
     @DisplayName("After stop no more callbacks arrive")
     void stopEndsDelivery() throws Exception {
         FakeSbi sbi = new FakeSbi(connection -> {
