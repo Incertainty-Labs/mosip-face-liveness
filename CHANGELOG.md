@@ -10,8 +10,12 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - `liveness-core`: options for slow devices (`EngineOptions`). The first Android build measured about 830 ms per frame on a mid-range phone (debuggable build), where the challenges cannot work.
   - `detectEvery(n)`: the face detector runs on the first frame, then every Nth, and at once when the face is lost; in between the face is followed with Face Mesh's own landmarks (`TrackingFaceAnalyzer`), as MediaPipe tracks. The followed box is mapped to a detector-sized box (mean IoU 0.95 against full detection on a drifting face). The passive PAD models run only on detection frames, since they were calibrated on detector boxes; the static-stream veto still sees every frame. The face count is the last detection's, so a second face is noticed at the next detection. Default 1, so Desktop is unchanged.
   - `withProvider("XNNPACK" | "NNAPI" | "CPU" | "AUTO")`: XNNPACK and NNAPI are used only where ONNX Runtime has them (Android); otherwise CPU, and `EngineInfo` says which. If an accelerator is tried and fails to start, the engine is built on CPU instead of refusing to start: acceleration changes speed only. AUTO stays CPU until phone measurements pick a better default.
-  - `threads(n)`: ONNX Runtime's intra-op threads.
+  - `threads(n)`: the inference threads; 0 (the default) is every core with XNNPACK and ONNX Runtime's own default otherwise. With XNNPACK the threads go to XNNPACK's pool and ONNX Runtime's own pool is one thread that does not spin, as ONNX Runtime's XNNPACK guide advises, so the two pools do not compete for the cores.
   - Every model class can load with given session options.
+
+### Removed
+
+- `EngineOptions.effectiveProvider()`: which provider runs depends on the platform's ONNX Runtime and on whether it starts, which the options cannot know. The engine reports it in `EngineInfo.executionProvider()`.
 
 ## [0.2.0] - 2026-10-24
 
