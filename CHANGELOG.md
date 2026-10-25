@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- `liveness-core`: `GeometricCaptureBinder` (package `binding`), the Desktop capture binder (TECHNICAL_DESIGN §8): the signed capture must show the scene the session just saw, from the same camera. The capture is compared with each of the session's last frames and the best pair counts, scored as the mean of face box overlap (coordinates scaled to 0..1, since resolutions may differ), landmark agreement (five points, relative to the eye distance) and a 64-bit perceptual hash of the face crop; bound at `bind.min.similarity` (0.60). Never bound when liveness did not pass, the session kept no frames, or the capture does not show exactly one face. The evidence digest becomes SHA-256 over the session's digest and the SHA-256 of the capture's decoded pixels. On test faces: the same scene 1.0, drifted 8 px 0.78, another person where the face was 0.29. It proves the scene, not identity.
+
 ## [0.2.0] - 2026-10-24
 
 The real engine: on-device face analysis, passive PAD and random challenges, loaded from a verified model bundle. Defaults for the face detector and the quality gate were set on one team member's real webcam clips; see each entry.
