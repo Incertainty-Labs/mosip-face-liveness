@@ -57,6 +57,20 @@ class SignedCaptureTest {
     }
 
     @Test
+    @DisplayName("A signature replaced by bytes of the wrong length is a signature that does not verify, not an"
+            + " unreadable capture")
+    void malformedSignatureFails() throws Exception {
+        String reply = device.captureReply("ISO".getBytes(StandardCharsets.US_ASCII), "abc", "2026-10-25T10:15:30Z");
+        String data = reply.substring(reply.indexOf("\"data\":\"") + 8);
+        data = data.substring(0, data.indexOf('"'));
+
+        SignedCapture c = SignedCapture.parse(reply.replace(data, data.substring(0, data.lastIndexOf('.') + 1)
+                + "AAAA"));
+
+        assertFalse(c.signatureValid());
+    }
+
+    @Test
     @DisplayName("Timestamps with milliseconds or an offset are read too")
     void timestampForms() throws Exception {
         byte[] iso = {1};

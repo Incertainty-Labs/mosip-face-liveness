@@ -64,11 +64,20 @@ public final class SignedCapture {
             Signature rsa = Signature.getInstance("SHA256withRSA");
             rsa.initVerify(certificate.getPublicKey());
             rsa.update((jwt[0] + "." + jwt[1]).getBytes(StandardCharsets.US_ASCII));
-            valid = "RS256".equals(header.path("alg").asText()) && rsa.verify(url.decode(jwt[2]));
+            valid = "RS256".equals(header.path("alg").asText()) && verifies(rsa, url.decode(jwt[2]));
         } catch (GeneralSecurityException | IllegalArgumentException e) {
             throw new IOException("The capture's signature cannot be checked: " + e.getMessage(), e);
         }
         return new SignedCapture(payload, certificate, valid);
+    }
+
+    /** A malformed signature, for example of the wrong length, is simply one that does not verify. */
+    private static boolean verifies(Signature rsa, byte[] signature) {
+        try {
+            return rsa.verify(signature);
+        } catch (java.security.SignatureException e) {
+            return false;
+        }
     }
 
     /** @return whether the signature checks against the certificate in the JWT's header */
