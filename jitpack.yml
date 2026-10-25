@@ -1,8 +1,11 @@
-# JitPack's image defaults to JDK 17; liveness-desktop and liveness-eval need 21.
-# SDKMAN identifiers are exact (there is no "21-open" alias); check with `sdk list java` when bumping.
+# JitPack's image defaults to an older JDK; liveness-desktop and liveness-eval need 21.
+# SDKMAN identifiers are exact (there is no "21-open" alias) and can be renamed: 21.0.12+1.1-tem stopped downloading
+# on 25 Oct 2026 while 21.0.12-tem works. Check with `sdk list java` when bumping. Zulu is the fallback.
 before_install:
-  - sdk install java 21.0.12+1.1-tem
-  - sdk use java 21.0.12+1.1-tem
+  - sdk install java 21.0.12-tem || sdk install java 21.0.12-zulu
+  - sdk use java 21.0.12-tem || sdk use java 21.0.12-zulu
 install:
+  # Without JDK 21 the build would go on with the image's JDK and fail on unrelated compile errors
+  - java -version 2>&1 | grep -q 'version "21' || { echo "JDK 21 is not active"; exit 1; }
   - mvn wrapper:wrapper -Dmaven=3.9.9
   - ./mvnw -B install -DskipTests

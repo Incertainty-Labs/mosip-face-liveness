@@ -4,6 +4,14 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-25
+
+The same code as 0.2.3, which JitPack could not build. Use 0.2.4.
+
+### Fixed
+
+- JitPack build: SDKMAN stopped serving JDK `21.0.12+1.1-tem`, so the build went on with the image's JDK 8 and failed in `liveness-desktop`. `jitpack.yml` installs `21.0.12-tem`, with Zulu as the fallback, and stops at once if JDK 21 is not active. CI was not affected.
+
 ## [0.2.3] - 2026-10-25
 
 What the Desktop Registration Client needs to check liveness before its face capture, and a Workbench fix.

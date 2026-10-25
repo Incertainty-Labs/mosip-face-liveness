@@ -124,5 +124,5 @@ public final class LivenessEngines {
     }
 
     /** The real engine's version, reported in every result and in the packet evidence. */
-    static final String HYBRID_VERSION = "liveness-core 0.2.3";
+    static final String HYBRID_VERSION = "liveness-core 0.2.4";
 }
