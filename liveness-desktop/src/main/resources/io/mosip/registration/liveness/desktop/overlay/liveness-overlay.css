@@ -1,0 +1,100 @@
+/* Face liveness overlay (UI_UX_SPEC section 3). Prompts sit on a solid panel, never over the video. */
+.liveness-overlay {
+    -liveness-primary: #1565c0;
+    -liveness-warning: #f2a900;
+    -liveness-success: #1b7f3b;
+    -liveness-error: #b3261e;
+    -fx-background-color: #ffffff;
+}
+
+.liveness-preview-pane {
+    -fx-background-color: #202124;
+}
+
+.liveness-panel {
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent transparent transparent #dadce0;
+}
+
+.liveness-status {
+    -fx-font-size: 16px;
+    -fx-text-fill: -liveness-primary;
+}
+
+.liveness-prompt {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #202124;
+}
+
+.liveness-cue {
+    -fx-fill: -liveness-primary;
+}
+
+.liveness-time .bar {
+    -fx-background-color: -liveness-primary;
+    -fx-background-insets: 0;
+    -fx-padding: 3px;
+}
+
+.liveness-time .track {
+    -fx-background-color: #e8eaed;
+    -fx-background-insets: 0;
+}
+
+.liveness-toast {
+    -fx-font-size: 14px;
+    -fx-text-fill: -liveness-success;
+    -fx-font-weight: bold;
+}
+
+.liveness-guidance-item, .liveness-attempt {
+    -fx-font-size: 14px;
+    -fx-text-fill: #3c4043;
+}
+
+.liveness-dot-done, .liveness-dot-current {
+    -fx-fill: -liveness-primary;
+}
+
+.liveness-dot-next {
+    -fx-fill: #dadce0;
+}
+
+.liveness-dot-current {
+    -fx-stroke: #0d47a1;
+    -fx-stroke-width: 2;
+}
+
+.liveness-primary {
+    -fx-background-color: -liveness-primary;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 14px;
+}
+
+.liveness-secondary {
+    -fx-font-size: 14px;
+}
+
+/* State groups: every state also has words, so colour is never the only signal. */
+.liveness-level-guidance .liveness-status {
+    -fx-text-fill: #202124;
+}
+
+.liveness-level-guidance .liveness-prompt {
+    -fx-background-color: -liveness-warning;
+    -fx-padding: 6px 10px;
+    -fx-font-size: 20px;
+}
+
+.liveness-level-success .liveness-status {
+    -fx-text-fill: -liveness-success;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+.liveness-level-failure .liveness-status, .liveness-level-device-error .liveness-status {
+    -fx-text-fill: -liveness-error;
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+}

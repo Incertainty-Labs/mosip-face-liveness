@@ -17,6 +17,8 @@
     <properties>
         <!-- The Desktop Registration Client on master runs on a Zulu 11 FX JRE (MOSIP: base changes on master). -->
         <maven.compiler.release>11</maven.compiler.release>
+        <!-- The overlay runs inside the client's own JavaFX 11, so it compiles against 11 and never ships JavaFX. -->
+        <javafx.version>11.0.2</javafx.version>
     </properties>
 
     <dependencies>
@@ -27,6 +29,12 @@
         <dependency>
             <groupId>com.microsoft.onnxruntime</groupId>
             <artifactId>onnxruntime</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>
