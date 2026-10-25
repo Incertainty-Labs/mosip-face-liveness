@@ -4,6 +4,18 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-25
+
+What the Desktop Registration Client needs to check liveness before its face capture, and a Workbench fix.
+
+### Added
+
+- `liveness-desktop`: `PushFrameSource`, the frames of a stream someone else reads. Inside the Registration Client, the client's `Streamer` holds the device's only live stream (a second one would keep the device busy) and hands each JPEG to `offer`. Frames are decoded and delivered on the source's own thread. While one is still being analysed, only the newest waits, so the analysis never falls behind the stream. An unreadable frame is LIV-012 and the stream goes on; `streamEnded` reports a dropped stream as LIV-002 and the end.
+- `liveness-desktop`: `LivenessGate`, the check the client runs before it asks the device for the face. The client's stream feeds a session and the overlay follows it; only a pass lets the client capture. Attempts are counted for one face field with `AttemptTracker`:
+  - a PAD or challenge failure uses an attempt and allows Scan again while attempts are left;
+  - the last one shows S12 with the actions `on.max.retries` allows, and a further start shows LIV-011 without starting the stream;
+  - a device error (LIV-001, LIV-002) and a cancel use none.
+
 ### Fixed
 
 - `liveness-workbench`: a refused Start, with a check already running or no attempt left (LIV-011), no longer opens anything. The window opened the source before `WorkbenchRun` refused, which set the MockMDS profile, started an empty recording and wrote a "Start ... attempt 4 of 3" line. During a running check it also replaced that check's device capturer and recording, leaving the old recording unclosed. `WorkbenchRun.start` now takes an `Opener`, called only once the check may run. A source that fails to open, including a device that answers with something unreadable, is audited, uses no attempt and frees the next Start.
