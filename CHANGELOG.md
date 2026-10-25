@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+### Fixed
+
+- `liveness-workbench`: a refused Start, with a check already running or no attempt left (LIV-011), no longer opens anything. The window opened the source before `WorkbenchRun` refused, which set the MockMDS profile, started an empty recording and wrote a "Start ... attempt 4 of 3" line. During a running check it also replaced that check's device capturer and recording, leaving the old recording unclosed. `WorkbenchRun.start` now takes an `Opener`, called only once the check may run. A source that fails to open, including a device that answers with something unreadable, is audited, uses no attempt and frees the next Start.
+
 ## [0.2.2] - 2026-10-25
 
 Findings from running the real engine on the phone and on the Liveness Workbench with a webcam: the step counter follows its contract, the neutral hold fits real faces, and per-frame diagnostics for a panel. Also the Desktop overlay and the Liveness Workbench.

@@ -181,7 +181,9 @@ public final class WorkbenchWindow extends BorderPane {
         start.setDefaultButton(true);
         start.setOnAction(e -> start());
         Button cancel = new Button("Cancel");
+        cancel.setId("workbench-cancel");
         cancel.setOnAction(e -> run.cancel());
+        record.setId("workbench-record");
         Button reset = new Button("Reset attempts");
         reset.setOnAction(e -> run.resetAttempts());
         FlowPane bar = new FlowPane(8, 6, new Label("Source"), source, device, new Label("Profile"), profile,
@@ -232,21 +234,17 @@ public final class WorkbenchWindow extends BorderPane {
         SourceChoice choice = choice();
         boolean recording = record.isSelected();
         card.getChildren().clear();
-        background.execute(() -> {
-            Opened opened;
-            try {
-                opened = sources.open(choice);
-            } catch (IOException e) {
-                log("Source not opened: " + e.getMessage());
-                return;
-            }
+        // The run opens the source only if the check may start, so a refused Start leaves the running check's
+        // capturer and recording, and the device's profile, as they are
+        background.execute(() -> run.start(chosen, policy, override != null, () -> {
+            Opened opened = sources.open(choice);
             capturer = opened.capturer;
             if (recording) {
                 startRecording(chosen, choice);
             }
             log("Source: " + opened.description);
-            run.start(chosen, policy, override != null, opened.frames);
-        });
+            return opened.frames;
+        }));
     }
 
     private SourceChoice choice() {

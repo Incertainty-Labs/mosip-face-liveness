@@ -54,6 +54,15 @@ public final class WorkbenchRun {
         SignedCapture capture(String nonce) throws IOException;
     }
 
+    /** Opens a check's frame source, with whatever goes with it (the device's capturer, a recording). */
+    public interface Opener {
+        /**
+         * @return the frame source, not started yet
+         * @throws IOException if the source cannot be opened
+         */
+        FrameSource open() throws IOException;
+    }
+
     private final LivenessEngine engine;
     private final CaptureCheck check;
     private final Capturer capturer;
@@ -91,26 +100,35 @@ public final class WorkbenchRun {
      * @param workflow       the workflow to check
      * @param policy         its policy
      * @param modeOverridden whether the Workbench's mode override set its mode, for the audit
-     * @param frames         the frame source; it is started here and stopped when the attempt ends
+     * @param opener         opens the frame source; it is started here and stopped when the attempt ends
      */
-    public void start(Workflow workflow, LivenessPolicy policy, boolean modeOverridden, FrameSource frames) {
+    public void start(Workflow workflow, LivenessPolicy policy, boolean modeOverridden, Opener opener) {
         if (!running.compareAndSet(false, true)) {
             ui.audit("A check is already running; Cancel it first");
             return;
         }
         AttemptTracker tracker = tracker(workflow, policy);
-        ui.audit("Start " + workflow + ": mode " + policy.mode() + (modeOverridden ? " (mode overridden in the"
-                + " Workbench)" : "") + ", attempt " + tracker.current() + " of " + tracker.limit() + ", source "
-                + frames.id());
-        for (String warning : policy.warnings()) {
-            ui.audit("Config warning: " + warning);
-        }
         if (tracker.current() > tracker.limit()) {
             ui.audit("No attempt left (LIV-011); Reset starts the count again");
             overlay.failed(LivenessErrorCode.MAX_RETRIES_EXCEEDED, tracker.limit(), tracker.limit(), false,
                     policy.onMaxRetries());
             running.set(false);
             return;
+        }
+        // Only now: opening the source also sets the MockMDS profile and starts the recording
+        FrameSource frames;
+        try {
+            frames = opener.open();
+        } catch (IOException | RuntimeException e) {
+            ui.audit("Source not opened: " + e.getMessage());
+            running.set(false);
+            return;
+        }
+        ui.audit("Start " + workflow + ": mode " + policy.mode() + (modeOverridden ? " (mode overridden in the"
+                + " Workbench)" : "") + ", attempt " + tracker.current() + " of " + tracker.limit() + ", source "
+                + frames.id());
+        for (String warning : policy.warnings()) {
+            ui.audit("Config warning: " + warning);
         }
         overlay.searching();
         LivenessSession started = engine.startSession(LivenessContext.builder().workflow(workflow)

@@ -56,7 +56,7 @@ class WorkbenchRunTest {
         Source source = new Source();
         WorkbenchRun run = run("PASS_PASSIVE", ui, nonce -> fresh(nonce));
 
-        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, source);
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> source);
 
         assertAll(() -> assertEquals(UiState.SUCCESS, ui.last().state()),
                 () -> assertTrue(ui.card.get().captureBound()),
@@ -70,12 +70,13 @@ class WorkbenchRunTest {
             + " attempt too")
     void failuresUseAttempts() {
         Ui pad = new Ui();
-        run("PAD", pad, nonce -> fresh(nonce)).start(Workflow.RESIDENT_REGISTRATION, policy(), false, new Source());
+        run("PAD", pad, nonce -> fresh(nonce)).start(Workflow.RESIDENT_REGISTRATION, policy(), false,
+                () -> new Source());
         Ui stale = new Ui();
         WorkbenchRun staleRun = run("PASS_PASSIVE", stale, nonce -> capture("someone-else", "2026-10-25T10:15:05Z"));
-        staleRun.start(Workflow.RESIDENT_REGISTRATION, policy(), false, new Source());
+        staleRun.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> new Source());
         OverlayView firstStale = stale.last();
-        staleRun.start(Workflow.RESIDENT_REGISTRATION, policy(), false, new Source());
+        staleRun.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> new Source());
 
         assertAll(() -> assertEquals(UiState.PAD_FAILURE, pad.last().state()),
                 () -> assertEquals("LIV-008", pad.last().errorCode()), () -> assertEquals(1, pad.last().attempt()),
@@ -87,25 +88,29 @@ class WorkbenchRunTest {
     }
 
     @Test
-    @DisplayName("After max.retries failures the last one shows S12, and a new start is refused with LIV-011 without"
-            + " opening the source; Reset starts the count again")
+    @DisplayName("After max.retries failures the last one shows S12, and a new start is refused with LIV-011 before"
+            + " its source is opened, so no stream, recording or profile change, and no Start line in the audit; Reset"
+            + " starts the count again")
     void maxRetries() {
         Ui ui = new Ui();
         WorkbenchRun run = run("FAIL_CHALLENGE", ui, nonce -> fresh(nonce));
         for (int i = 0; i < 3; i++) {
-            run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, new Source());
+            run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> new Source());
         }
         OverlayView third = ui.last();
-        Source refused = new Source();
+        int starts = ui.starts();
+        Opens refused = new Opens(new Source());
         run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, refused);
         OverlayView limit = ui.last();
+        int startsAfterRefusal = ui.starts();
         run.resetAttempts();
-        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, new Source());
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> new Source());
 
         assertAll(() -> assertEquals(UiState.MAX_RETRIES, third.state()), () -> assertEquals("LIV-009",
                         third.errorCode()),
                 () -> assertEquals(UiState.MAX_RETRIES, limit.state()), () -> assertEquals("LIV-011", limit.errorCode()),
-                () -> assertFalse(refused.started, "no new session"),
+                () -> assertEquals(0, refused.calls, "the source is not opened"),
+                () -> assertEquals(starts, startsAfterRefusal, "no Start line for the refused press"),
                 () -> assertEquals(1, ui.last().attempt(), "counted again from 1 after Reset"));
     }
 
@@ -116,7 +121,7 @@ class WorkbenchRunTest {
         WorkbenchRun run = run("PASS_PASSIVE", ui, nonce -> {
             throw new IOException("MockMDS is gone");
         });
-        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, new Source());
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> new Source());
         OverlayView device = ui.last();
 
         assertAll(() -> assertEquals(UiState.DEVICE_ERROR, device.state()),
@@ -136,7 +141,7 @@ class WorkbenchRunTest {
             return fresh(nonce);
         });
 
-        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, source);
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> source);
 
         assertAll(() -> assertFalse(stoppedAtCapture[0], "still open at the capture"),
                 () -> assertTrue(source.stopped, "stopped after"),
@@ -144,24 +149,64 @@ class WorkbenchRunTest {
     }
 
     @Test
-    @DisplayName("Start while a check is running does nothing but say so: a second check would open a second stream,"
-            + " and the first one's stream would never be stopped; after a cancel, Start works again")
+    @DisplayName("Start while a check is running does nothing but say so, and opens no source: a second check would"
+            + " open a second stream, and the first one's stream would never be stopped; after a cancel, Start works"
+            + " again")
     void oneCheckAtATime() {
         Ui ui = new Ui();
         WorkbenchRun run = run("PASS_PASSIVE", ui, nonce -> fresh(nonce));
         Silent first = new Silent();
-        Silent second = new Silent();
+        Opens second = new Opens(new Silent());
         Silent third = new Silent();
 
-        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, first);
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> first);
         run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, second);
         run.cancel();
-        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, third);
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> third);
 
-        assertAll(() -> assertTrue(first.started), () -> assertFalse(second.started, "refused while running"),
+        assertAll(() -> assertTrue(first.started), () -> assertEquals(0, second.calls, "refused while running"),
                 () -> assertTrue(ui.audited("already running")),
                 () -> assertTrue(first.stopped, "the cancelled check stops its own stream"),
                 () -> assertTrue(third.started, "Start works again after the cancel"));
+    }
+
+    @Test
+    @DisplayName("A source that cannot be opened, or whose device answers with something unreadable, is audited and"
+            + " frees the run, without using an attempt, so the next Start runs")
+    void openFailureFreesTheRun() {
+        Ui ui = new Ui();
+        WorkbenchRun run = run("PASS_PASSIVE", ui, nonce -> fresh(nonce));
+        Source next = new Source();
+
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> {
+            throw new IOException("No face device at 127.0.0.1:4501");
+        });
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> {
+            throw new IllegalStateException("unreadable device info");
+        });
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> next);
+
+        assertAll(() -> assertTrue(ui.audited("Source not opened: No face device at 127.0.0.1:4501")),
+                () -> assertTrue(ui.audited("Source not opened: unreadable device info")),
+                () -> assertTrue(next.started, "the next Start runs"),
+                () -> assertTrue(ui.audited("attempt 1 of 3"), "no attempt used"),
+                () -> assertEquals(UiState.SUCCESS, ui.last().state()));
+    }
+
+    /** Opens one source, counting the calls. */
+    static final class Opens implements WorkbenchRun.Opener {
+        final FrameSource source;
+        int calls;
+
+        Opens(FrameSource source) {
+            this.source = source;
+        }
+
+        @Override
+        public FrameSource open() {
+            calls++;
+            return source;
+        }
     }
 
     /** Starts but sends no frame, so its check stays in progress. */
@@ -195,7 +240,7 @@ class WorkbenchRunTest {
     void clear() {
         Ui ui = new Ui();
         WorkbenchRun run = run("PASS_PASSIVE", ui, nonce -> fresh(nonce));
-        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, new Source());
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, () -> new Source());
 
         run.clear();
 
@@ -208,7 +253,8 @@ class WorkbenchRunTest {
     void clipHasNoCapture() {
         Ui ui = new Ui();
 
-        run("PASS_PASSIVE", ui, nonce -> null).start(Workflow.RESIDENT_REGISTRATION, policy(), false, new Source());
+        run("PASS_PASSIVE", ui, nonce -> null).start(Workflow.RESIDENT_REGISTRATION, policy(), false,
+                () -> new Source());
 
         assertAll(() -> assertEquals(UiState.SUCCESS, ui.last().state()),
                 () -> assertTrue(ui.audited("no device capture")),
@@ -222,7 +268,7 @@ class WorkbenchRunTest {
         LivenessPolicy active = WorkbenchConfigTestSupport.policy(LivenessMode.ACTIVE);
 
         run("PASS_ACTIVE", ui, nonce -> fresh(nonce)).start(Workflow.RESIDENT_REGISTRATION, active, true,
-                new Source());
+                () -> new Source());
 
         assertAll(() -> assertTrue(ui.audited("RESIDENT_REGISTRATION")), () -> assertTrue(ui.audited("ACTIVE")),
                 () -> assertTrue(ui.audited("mode overridden")), () -> assertTrue(ui.audited("ACTIVE_CHALLENGE")),
@@ -316,6 +362,19 @@ class WorkbenchRunTest {
 
         OverlayView last() {
             return views.get(views.size() - 1);
+        }
+
+        /** @return how many checks the audit says were started */
+        int starts() {
+            synchronized (audit) {
+                int n = 0;
+                for (String line : audit) {
+                    if (line.startsWith("Start ")) {
+                        n++;
+                    }
+                }
+                return n;
+            }
         }
 
         boolean audited(String text) {

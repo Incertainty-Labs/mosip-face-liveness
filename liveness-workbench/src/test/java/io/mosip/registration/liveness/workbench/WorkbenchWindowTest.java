@@ -15,10 +15,12 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import javafx.application.Platform;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -92,6 +94,46 @@ class WorkbenchWindowTest {
                 () -> assertTrue(audit.contains("Capture bound"), audit),
                 () -> assertTrue(onFx(() -> ((Label) window.lookup("#workbench-card-capture")).getText())
                         .startsWith("bound")));
+    }
+
+    @Test
+    @DisplayName("Start pressed again while a check runs opens nothing: no second stream, MockMDS profile or"
+            + " recording, so the running check keeps its own device capturer and recording")
+    void secondStartOpensNothing() throws Exception {
+        LivenessEngine engine = LivenessEngines.stub(Collections.singletonMap(
+                LivenessConfigLoader.PREFIX + "stub.force", "PASS_PASSIVE"));
+        FaceObservation face = FaceObservation.builder().faces(1, new Rect(60, 80, 120, 140)).build();
+        AtomicInteger opens = new AtomicInteger();
+        WorkbenchWindow.Sources sources = choice -> {
+            opens.incrementAndGet();
+            return new WorkbenchWindow.Opened(new WorkbenchRunTest.Silent(), nonce -> fresh(nonce),
+                    "silent test source");
+        };
+
+        WorkbenchWindow window = onFx(() -> {
+            try {
+                WorkbenchWindow w = new WorkbenchWindow(engine, frame -> face, sources, WorkbenchConfigWithBinderOff(),
+                        recordings, Runnable::run);
+                new javafx.scene.Scene(w, 1400, 900);
+                ((CheckBox) w.lookup("#workbench-record")).setSelected(true);
+                Button start = (Button) w.lookup("#workbench-start");
+                start.fire();
+                start.fire();
+                return w;
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        String audit = onFx(() -> ((TextArea) window.lookup("#workbench-audit")).getText());
+        // Ends the check, which closes its recording before the temporary folder is removed
+        onFx(() -> {
+            ((Button) window.lookup("#workbench-cancel")).fire();
+            return null;
+        });
+
+        assertAll(() -> assertEquals(1, opens.get(), "one source opened"),
+                () -> assertEquals(1, audit.split("Recording to", -1).length - 1, audit),
+                () -> assertTrue(audit.contains("already running"), audit));
     }
 
     private static WorkbenchConfig WorkbenchConfigWithBinderOff() throws IOException {
