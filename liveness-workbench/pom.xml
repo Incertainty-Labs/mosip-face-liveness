@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.mosip.registration.liveness</groupId>
+        <artifactId>mosip-face-liveness</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>liveness-workbench</artifactId>
+    <name>liveness-workbench</name>
+    <description>Liveness Workbench: a desktop demo and test app that runs the engine on a MockMDS stream or a recorded clip, captures through the SBI, and shows the overlay, diagnostics and audit. Never part of the Registration Client.</description>
+
+    <properties>
+        <maven.compiler.release>11</maven.compiler.release>
+        <javafx.version>11.0.2</javafx.version>
+        <!-- The Registration Client on master decodes ISO faces with this version; the Workbench does the same. -->
+        <biometrics.util.version>1.2.0.2</biometrics.util.version>
+        <jackson.version>2.15.0</jackson.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.mosip.registration.liveness</groupId>
+            <artifactId>liveness-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.mosip.registration.liveness</groupId>
+            <artifactId>liveness-desktop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.mosip.registration.liveness</groupId>
+            <artifactId>liveness-eval</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.mosip.biometric.util</groupId>
+            <artifactId>biometrics-util</artifactId>
+            <version>${biometrics.util.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <!-- The Workbench runs on a JDK that has JavaFX (the team's Zulu FX JDK); these only let it compile anywhere. -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

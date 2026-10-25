@@ -25,6 +25,7 @@
         <module>face-verification</module>
         <module>liveness-desktop</module>
         <module>liveness-eval</module>
+        <module>liveness-workbench</module>
     </modules>
 
     <properties>
