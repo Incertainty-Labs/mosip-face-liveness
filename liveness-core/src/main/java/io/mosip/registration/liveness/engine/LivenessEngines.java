@@ -1,6 +1,7 @@
 package io.mosip.registration.liveness.engine;
 
 import ai.onnxruntime.OrtException;
+import ai.onnxruntime.OrtSession;
 import io.mosip.registration.liveness.api.EngineInfo;
 import io.mosip.registration.liveness.api.LivenessEngine;
 import io.mosip.registration.liveness.api.LivenessErrorCode;
@@ -9,6 +10,7 @@ import io.mosip.registration.liveness.api.PadDetector;
 import io.mosip.registration.liveness.config.LivenessConfigLoader;
 import io.mosip.registration.liveness.engine.onnx.MiniFasNetPadDetector;
 import io.mosip.registration.liveness.engine.onnx.OnnxFaceAnalyzer;
+import io.mosip.registration.liveness.engine.onnx.Sessions;
 import io.mosip.registration.liveness.model.ModelRegistry;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -45,15 +47,38 @@ public final class LivenessEngines {
      * @throws LivenessException LIV-013 if a model cannot be loaded
      */
     public static LivenessEngine hybrid(ModelRegistry models, EngineOptions options) throws LivenessException {
+        return hybrid(models, options, Sessions.effectiveProvider(options.requestedProvider()));
+    }
+
+    /**
+     * Builds the engine on {@code provider}; if an accelerator fails to start, it is built on CPU instead, since
+     * acceleration changes speed only and must never stop liveness.
+     */
+    static LivenessEngine hybrid(ModelRegistry models, EngineOptions options, String provider)
+            throws LivenessException {
+        try {
+            return build(models, options, provider);
+        } catch (LivenessException e) {
+            if ("CPU".equals(provider)) {
+                throw e;
+            }
+            return build(models, options, "CPU");
+        }
+    }
+
+    private static LivenessEngine build(ModelRegistry models, EngineOptions options, String provider)
+            throws LivenessException {
         final OnnxFaceAnalyzer analyzer;
         final MiniFasNetPadDetector v2;
         final MiniFasNetPadDetector v1se;
         try {
-            analyzer = OnnxFaceAnalyzer.load(models, LivenessConfigLoader.DEFAULT_DETECTOR_MIN_SCORE);
-            v2 = MiniFasNetPadDetector.load(models, "minifasnet_v2", 2.7);
-            v1se = MiniFasNetPadDetector.load(models, "minifasnet_v1se", 4.0);
+            OrtSession.SessionOptions session = Sessions.options(provider, options.threads());
+            analyzer = OnnxFaceAnalyzer.load(models, LivenessConfigLoader.DEFAULT_DETECTOR_MIN_SCORE, session);
+            v2 = MiniFasNetPadDetector.load(models, "minifasnet_v2", 2.7, session);
+            v1se = MiniFasNetPadDetector.load(models, "minifasnet_v1se", 4.0, session);
         } catch (OrtException | RuntimeException e) {
-            throw new LivenessException(LivenessErrorCode.ENGINE_ERROR, "Cannot load the models: " + e.getMessage());
+            throw new LivenessException(LivenessErrorCode.ENGINE_ERROR, "Cannot load the models on " + provider + ": "
+                    + e.getMessage());
         }
         ExecutorService workers = Executors.newCachedThreadPool(task -> {
             Thread thread = new Thread(task, "liveness-worker");
@@ -61,13 +86,15 @@ public final class LivenessEngines {
             return thread;
         });
         return new HybridLivenessEngine(new EngineParts(
-                analyzer::withMinScore,
+                // Each session gets its own view; with sparse detection it is a per-session tracker
+                minScore -> options.detectEvery() > 1 ? analyzer.tracking(minScore, options.detectEvery())
+                        : analyzer.withMinScore(minScore),
                 // The static-stream veto is stateful, so each session gets its own
                 () -> Arrays.<PadDetector>asList(v2, v1se, new StaticStreamDetector()),
                 new RandomChallengeGenerator(true),
                 new SecureRandom(),
                 workers,
-                new EngineInfo(HYBRID_VERSION, models.versions(), options.effectiveProvider())));
+                new EngineInfo(HYBRID_VERSION, models.versions(), provider)));
     }
 
     /** The real engine's version, reported in every result and in the packet evidence. */

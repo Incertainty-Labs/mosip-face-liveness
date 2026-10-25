@@ -130,11 +130,14 @@ final class HybridSession implements LivenessSession {
         frames++;
         FaceObservation observation;
         double fused;
+        boolean detected;
         try {
             observation = analyzer.analyze(frame);
+            // PAD runs only where the face detector ran: its models were calibrated on detector boxes
+            detected = !(analyzer instanceof DetectingAnalyzer) || ((DetectingAnalyzer) analyzer).detected();
             remember(frame, observation);
             frameHashes.add(sha256().digest(frame.rgb()));
-            fused = assessor.add(frame, observation);
+            fused = assessor.add(frame, observation, detected);
         } catch (RuntimeException e) {
             // Runtime problems arrive as a result, never as an exception on the frame thread (API.md §3.8)
             finish(SessionState.ERROR, Decision.INCONCLUSIVE, LivenessErrorCode.ENGINE_ERROR, now);
@@ -149,7 +152,7 @@ final class HybridSession implements LivenessSession {
         switch (state) {
             case WAITING_FOR_FACE:
             case PASSIVE_CHECK:
-                passive(frame, observation, fused, now);
+                passive(frame, observation, fused, detected, now);
                 break;
             case ACTIVE_CHALLENGE:
             case NEUTRAL_HOLD:
@@ -171,11 +174,17 @@ final class HybridSession implements LivenessSession {
         }
     }
 
-    /** Gathers the passive window from frames the quality gate passes, then decides by mode. */
-    private void passive(FaceFrame frame, FaceObservation observation, double fused, long now) {
+    /**
+     * Gathers the passive window from frames the quality gate passes and the detector ran on, then decides by mode.
+     */
+    private void passive(FaceFrame frame, FaceObservation observation, double fused, boolean detected, long now) {
         if (Double.isNaN(fused)) {
             // The quality gate turned the frame away: show its guidance; the frames gathered so far are kept
             QualityGate.Verdict verdict = QualityGate.check(observation, frame.width(), frame.height(), policy);
+            if (verdict == null && !detected) {
+                // A good frame between detections: nothing to score, wait for the next detection
+                return;
+            }
             String key = verdict == null ? "liveness.guidance.face_not_found" : verdict.messageKey();
             if (state != SessionState.WAITING_FOR_FACE || !key.equals(guidanceKey)) {
                 guidanceKey = key;

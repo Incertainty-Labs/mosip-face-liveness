@@ -70,9 +70,22 @@ public final class MiniFasNetPadDetector implements PadDetector, AutoCloseable {
      * @throws OrtException if the model cannot be loaded
      */
     public static MiniFasNetPadDetector load(ModelRegistry registry, String name, double scale) throws OrtException {
+        return load(registry, name, scale, new OrtSession.SessionOptions());
+    }
+
+    /**
+     * @param registry the model bundle
+     * @param name     the model and cue name in the bundle
+     * @param scale    the crop scale the model was trained with
+     * @param options  the session options (execution provider, threads)
+     * @return the detector
+     * @throws OrtException if the model cannot be loaded
+     */
+    public static MiniFasNetPadDetector load(ModelRegistry registry, String name, double scale,
+            OrtSession.SessionOptions options) throws OrtException {
         OrtEnvironment env = OrtEnvironment.getEnvironment();
-        return new MiniFasNetPadDetector(env, env.createSession(registry.bytes(name), new OrtSession.SessionOptions()),
-                scale, name, registry.versions().get(name));
+        return new MiniFasNetPadDetector(env, env.createSession(registry.bytes(name), options), scale, name,
+                registry.versions().get(name));
     }
 
     @Override

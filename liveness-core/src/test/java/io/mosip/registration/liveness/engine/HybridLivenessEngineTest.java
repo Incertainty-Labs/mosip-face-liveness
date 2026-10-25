@@ -368,6 +368,48 @@ class HybridLivenessEngineTest {
                 () -> assertEquals(5, passed.recentFrames().size(), "passed: kept for the binder"));
     }
 
+    @Test
+    @DisplayName("With an analyzer that detects every 3rd frame, PAD runs only on detection frames (the passive window"
+            + " fills from them), while the static-stream veto still sees every frame")
+    void padOnlyOnDetectionFrames() {
+        int[] calls = {0};
+        DetectingAnalyzer analyzer = new DetectingAnalyzer() {
+            @Override
+            public FaceObservation analyze(FaceFrame frame) {
+                calls[0]++;
+                return FRONTAL;
+            }
+
+            @Override
+            public boolean detected() {
+                return (calls[0] - 1) % 3 == 0;
+            }
+        };
+        List<Long> padFrames = new ArrayList<Long>();
+        List<Long> vetoFrames = new ArrayList<Long>();
+        PadDetector pad = scripted("minifasnet_v2", frame -> {
+            padFrames.add(frame.sequence());
+            return 0.95;
+        }, false);
+        PadDetector frozen = scripted("static_stream", frame -> {
+            vetoFrames.add(frame.sequence());
+            return 1.0;
+        }, false);
+        Recorder recorder = new Recorder();
+        LivenessSession session = new HybridLivenessEngine(new EngineParts(minScore -> analyzer,
+                () -> Arrays.asList(pad, frozen),
+                (policy, source, r) -> sequence(Collections.<ChallengeType>emptyList(), policy), new SecureRandom(),
+                Runnable::run, new EngineInfo("test", Collections.<String, String>emptyMap(), "CPU")))
+                .startSession(context(), policy(), recorder);
+
+        feed(session, 0, 400);
+
+        assertAll(() -> assertEquals(Arrays.asList(0L, 3L, 6L), padFrames, "PAD on detection frames only"),
+                () -> assertEquals(9, vetoFrames.size(), "the veto sees frames 0 to 8"),
+                () -> assertEquals(SessionState.NEUTRAL_HOLD, session.state(),
+                        "three PAD-scored frames fill the passive window"));
+    }
+
     /** A passive pass over frames whose pixels are {@link #pixels}; {@code tamper} changes one pixel of frame 5. */
     private static LivenessResult runWithFrames(int tamper) {
         Recorder recorder = new Recorder();

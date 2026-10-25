@@ -72,12 +72,25 @@ public final class PassiveAssessor {
      * @return this frame's fused live score, 0..1, or NaN when the quality gate rejects the frame (not scored)
      */
     public double add(FaceFrame frame, FaceObservation observation) {
+        return add(frame, observation, true);
+    }
+
+    /**
+     * Scores one frame, or only checks it.
+     *
+     * @param frame       the frame
+     * @param observation the analyzer's output for it
+     * @param score       false to run only the veto cues, for a frame where the face detector did not run: the weighted
+     *                    cues need a detector box
+     * @return this frame's fused live score, or NaN when not scored
+     */
+    public double add(FaceFrame frame, FaceObservation observation, boolean score) {
         for (PadDetector detector : vetoOnly) {
             if (detector.score(frame, observation).veto() && vetoedBy == null) {
                 vetoedBy = detector.name();
             }
         }
-        if (QualityGate.check(observation, frame.width(), frame.height(), policy) != null) {
+        if (!score || QualityGate.check(observation, frame.width(), frame.height(), policy) != null) {
             return Double.NaN;
         }
         double fused = 0;

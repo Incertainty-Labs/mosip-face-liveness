@@ -7,6 +7,11 @@ All notable changes to this project are recorded here. The format follows [Keep 
 ### Added
 
 - `liveness-core`: `GeometricCaptureBinder` (package `binding`), the Desktop capture binder (TECHNICAL_DESIGN §8): the signed capture must show the scene the session just saw, from the same camera. The capture is compared with each of the session's last frames and the best pair counts, scored as the mean of face box overlap (coordinates scaled to 0..1, since resolutions may differ), landmark agreement (five points, relative to the eye distance) and a 64-bit perceptual hash of the face crop; bound at `bind.min.similarity` (0.60). Never bound when liveness did not pass, the session kept no frames, or the capture does not show exactly one face. The evidence digest becomes SHA-256 over the session's digest and the SHA-256 of the capture's decoded pixels. On test faces: the same scene 1.0, drifted 8 px 0.78, another person where the face was 0.29. It proves the scene, not identity.
+- `liveness-core`: options for slow devices (`EngineOptions`). The first Android build measured about 830 ms per frame on a mid-range phone (debuggable build), where the challenges cannot work.
+  - `detectEvery(n)`: the face detector runs on the first frame, then every Nth, and at once when the face is lost; in between the face is followed with Face Mesh's own landmarks (`TrackingFaceAnalyzer`), as MediaPipe tracks. The followed box is mapped to a detector-sized box (mean IoU 0.95 against full detection on a drifting face). The passive PAD models run only on detection frames, since they were calibrated on detector boxes; the static-stream veto still sees every frame. The face count is the last detection's, so a second face is noticed at the next detection. Default 1, so Desktop is unchanged.
+  - `withProvider("XNNPACK" | "NNAPI" | "CPU" | "AUTO")`: XNNPACK and NNAPI are used only where ONNX Runtime has them (Android); otherwise CPU, and `EngineInfo` says which. If an accelerator is tried and fails to start, the engine is built on CPU instead of refusing to start: acceleration changes speed only. AUTO stays CPU until phone measurements pick a better default.
+  - `threads(n)`: ONNX Runtime's intra-op threads.
+  - Every model class can load with given session options.
 
 ## [0.2.0] - 2026-10-24
 

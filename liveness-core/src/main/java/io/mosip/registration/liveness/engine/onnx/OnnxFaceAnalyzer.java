@@ -1,6 +1,7 @@
 package io.mosip.registration.liveness.engine.onnx;
 
 import ai.onnxruntime.OrtException;
+import ai.onnxruntime.OrtSession;
 import io.mosip.registration.liveness.api.FaceAnalyzer;
 import io.mosip.registration.liveness.api.FaceFrame;
 import io.mosip.registration.liveness.api.FaceObservation;
@@ -66,11 +67,23 @@ public final class OnnxFaceAnalyzer implements FaceAnalyzer, AutoCloseable {
      * @throws OrtException if a model cannot be loaded
      */
     public static OnnxFaceAnalyzer load(ModelRegistry registry, double minScore) throws OrtException {
-        YuNetDetector detector = YuNetDetector.load(registry.bytes("yunet"));
+        return load(registry, minScore, new OrtSession.SessionOptions());
+    }
+
+    /**
+     * @param registry the model bundle, with {@code yunet}, {@code facemesh_v2} and {@code blendshape_v2}
+     * @param minScore the minimum detector confidence for a face to count
+     * @param options  the session options for the three models (execution provider, threads)
+     * @return the analyzer
+     * @throws OrtException if a model cannot be loaded
+     */
+    public static OnnxFaceAnalyzer load(ModelRegistry registry, double minScore, OrtSession.SessionOptions options)
+            throws OrtException {
+        YuNetDetector detector = YuNetDetector.load(registry.bytes("yunet"), options);
         FaceMeshLandmarker landmarker = null;
         try {
-            landmarker = FaceMeshLandmarker.load(registry.bytes("facemesh_v2"));
-            BlendshapeScorer scorer = BlendshapeScorer.load(registry.bytes("blendshape_v2"));
+            landmarker = FaceMeshLandmarker.load(registry.bytes("facemesh_v2"), options);
+            BlendshapeScorer scorer = BlendshapeScorer.load(registry.bytes("blendshape_v2"), options);
             return new OnnxFaceAnalyzer(detector, landmarker, scorer, (float) minScore);
         } catch (OrtException | RuntimeException e) {
             detector.close();
@@ -102,20 +115,49 @@ public final class OnnxFaceAnalyzer implements FaceAnalyzer, AutoCloseable {
             return FaceObservation.builder().build();
         }
         FaceDetection face = largest(faces);
-        FaceMesh mesh = landmarker.landmarks(frame, face);
+        return observe(frame, landmarker.landmarks(frame, face), faces.size(), face.x(), face.y(), face.width(),
+                face.height());
+    }
+
+    /**
+     * @param minScore      the minimum detector confidence for a face to count
+     * @param detectEvery   run the detector on every this many frames, and follow the face with Face Mesh between
+     * @return a per-session analyzer that shares this one's models; see {@link TrackingFaceAnalyzer}
+     */
+    public TrackingFaceAnalyzer tracking(double minScore, int detectEvery) {
+        return new TrackingFaceAnalyzer(this, (float) minScore, detectEvery);
+    }
+
+    /**
+     * @param detectEvery run the detector on every this many frames
+     * @return {@link #tracking(double, int)} with this analyzer's minimum score
+     */
+    public TrackingFaceAnalyzer tracking(int detectEvery) {
+        return tracking(minScore, detectEvery);
+    }
+
+    YuNetDetector detector() {
+        return detector;
+    }
+
+    FaceMeshLandmarker landmarker() {
+        return landmarker;
+    }
+
+    /** The observation of the face whose mesh and (detector-sized) box are given. */
+    FaceObservation observe(FaceFrame frame, FaceMesh mesh, int faceCount, float x, float y, float w, float h) {
         float[] scores = scorer.score(mesh);
         HeadPose pose = HeadPose.of(mesh);
-        FrameQuality quality = FrameQuality.of(frame, face.x(), face.y(), face.width(), face.height());
+        FrameQuality quality = FrameQuality.of(frame, x, y, w, h);
 
         float[] xy = new float[mesh.size() * 2];
         for (int i = 0; i < mesh.size(); i++) {
             xy[2 * i] = mesh.x(i);
             xy[2 * i + 1] = mesh.y(i);
         }
-        Rect box = new Rect(Math.round(face.x()), Math.round(face.y()), Math.round(face.width()),
-                Math.round(face.height()));
+        Rect box = new Rect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
         return FaceObservation.builder()
-                .faces(faces.size(), box)
+                .faces(faceCount, box)
                 .landmarks(xy)
                 .pose(pose.yawDeg(), pose.pitchDeg(), pose.rollDeg())
                 .eyesOpen(1f - scores[BlendshapeScorer.EYE_BLINK_LEFT], 1f - scores[BlendshapeScorer.EYE_BLINK_RIGHT])
@@ -132,7 +174,7 @@ public final class OnnxFaceAnalyzer implements FaceAnalyzer, AutoCloseable {
         scorer.close();
     }
 
-    private static FaceDetection largest(List<FaceDetection> faces) {
+    static FaceDetection largest(List<FaceDetection> faces) {
         FaceDetection best = faces.get(0);
         for (FaceDetection f : faces) {
             if (f.width() * f.height() > best.width() * best.height()) {

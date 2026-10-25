@@ -61,8 +61,18 @@ public final class BlendshapeScorer implements AutoCloseable {
      * @throws OrtException if the model cannot be loaded
      */
     public static BlendshapeScorer load(byte[] model) throws OrtException {
+        return load(model, new OrtSession.SessionOptions());
+    }
+
+    /**
+     * @param model   the ONNX file's bytes
+     * @param options the session options (execution provider, threads)
+     * @return the model
+     * @throws OrtException if the model cannot be loaded
+     */
+    public static BlendshapeScorer load(byte[] model, OrtSession.SessionOptions options) throws OrtException {
         OrtEnvironment env = OrtEnvironment.getEnvironment();
-        return new BlendshapeScorer(env, env.createSession(model, new OrtSession.SessionOptions()));
+        return new BlendshapeScorer(env, env.createSession(model, options));
     }
 
     /**
