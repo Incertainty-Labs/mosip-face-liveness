@@ -28,7 +28,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -281,12 +284,28 @@ final class HybridSession implements LivenessSession {
                 .frames(frames, duration > 0 ? frames * 1000.0 / duration : 0.0)
                 .durationMs(duration)
                 .errorCode(error)
+                .diagnostics(diagnostics())
                 .evidenceDigest(finalState == SessionState.PASSED || finalState == SessionState.FAILED ? digest()
                         : null)
                 .nonce(nonce)
                 .versions(parts.info.engineVersion(), parts.info.modelVersions())
                 .build();
         callback.onResult(result);
+    }
+
+    /**
+     * For audit and the diagnostics panel, never for the user: {@code pad.<cue>} is each PAD model's median over the
+     * passive window, to 3 decimals, and {@code pad.veto} the cue that vetoed, if one did.
+     */
+    private Map<String, String> diagnostics() {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        for (Map.Entry<String, Double> cue : assessor.cues().entrySet()) {
+            out.put("pad." + cue.getKey(), String.format(Locale.ROOT, "%.3f", cue.getValue()));
+        }
+        if (assessor.veto() != null) {
+            out.put("pad.veto", assessor.veto());
+        }
+        return out;
     }
 
     /**

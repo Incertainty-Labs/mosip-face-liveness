@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- `liveness-core`: the real engine fills `LivenessResult.diagnostics()`, which was always empty: `pad.<model>` is each PAD model's median over the passive window, to 3 decimals, and `pad.veto` the cue that vetoed (for example `static_stream`), if one did. For audit and a diagnostics panel only, never for the user.
+
 ## [0.2.1] - 2026-10-25
 
 The Desktop capture binder, and options for slow devices: the first Android build of the real engine was too slow for the challenges.

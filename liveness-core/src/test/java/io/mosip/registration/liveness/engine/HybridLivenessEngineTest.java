@@ -175,6 +175,28 @@ class HybridLivenessEngineTest {
                 () -> assertEquals(1, recorder.result.framesAnalysed(), "on the first frame"));
     }
 
+    @Test
+    @DisplayName("The result's diagnostics hold each PAD model's median over the passive window (pad.<name>), and the"
+            + " cue that vetoed (pad.veto), for audit and the diagnostics panel")
+    void diagnosticsHoldTheCueScores() {
+        Recorder passed = new Recorder();
+        LivenessSession live = engine(frame -> FRONTAL, Arrays.<PadDetector>asList(new Fixed("minifasnet_v2", 0.95),
+                new Fixed("minifasnet_v1se", 0.875)), Collections.<ChallengeType>emptyList())
+                .startSession(context(), policy("pad.weights", "minifasnet_v2:0.5,minifasnet_v1se:0.5"), passed);
+        Recorder vetoed = new Recorder();
+        LivenessSession frozen = engine(frame -> FRONTAL,
+                Arrays.<PadDetector>asList(new Fixed("minifasnet_v2", 0.95), scripted("static_stream", f -> 1.0, true)),
+                Collections.<ChallengeType>emptyList()).startSession(context(), policy(), vetoed);
+
+        feed(live, 0, 2000);
+        feed(frozen, 0, 2000);
+
+        assertAll(() -> assertEquals("0.950", passed.result.diagnostics().get("pad.minifasnet_v2")),
+                () -> assertEquals("0.875", passed.result.diagnostics().get("pad.minifasnet_v1se")),
+                () -> assertFalse(passed.result.diagnostics().containsKey("pad.veto")),
+                () -> assertEquals("static_stream", vetoed.result.diagnostics().get("pad.veto")));
+    }
+
     @ParameterizedTest(name = "{0}")
     @CsvSource({"a second face, MULTIPLE_FACES", "the face jumping, CHALLENGE_FAILED"})
     @DisplayName("TC-ENG-10: during the challenges, a second face fails with LIV-005 and a face that jumps with"
