@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-25
+
+Findings from running the real engine on the phone and on the Liveness Workbench with a webcam: the step counter follows its contract, the neutral hold fits real faces, and per-frame diagnostics for a panel. Also the Desktop overlay and the Liveness Workbench.
+
 ### Added
 
 - `liveness-core`: `LivenessCallback.onFrameAnalysed(observation, scores)`, a default method (agreed by both maintainers): after each analysed frame, the face observation (no pixels) and each PAD model's live probability on that frame, empty where the PAD models did not run. For a diagnostics panel only; an exception thrown there is ignored, so diagnostics never change a result. Existing callbacks compile and run unchanged. `PassiveAssessor.lastScores()` gives the scores.
