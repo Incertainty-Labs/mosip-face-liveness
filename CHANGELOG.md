@@ -7,6 +7,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 ### Added
 
 - `liveness-core`: the real engine fills `LivenessResult.diagnostics()`, which was always empty: `pad.<model>` is each PAD model's median over the passive window, to 3 decimals, and `pad.veto` the cue that vetoed (for example `static_stream`), if one did. For audit and a diagnostics panel only, never for the user.
+- `liveness-desktop`: the liveness overlay's rules without a UI toolkit (package `overlay`). `OverlayModel` turns a session's events into an `OverlayView` for each UI state of UI_UX_SPEC section 4: device search, position, guidance, the passive check with its ring, each challenge with Step i of n, its direction cue, time bar and an "Action detected" toast, the neutral hold, capturing and success; liveness, PAD, device and engine failures by error code with the attempt counter and the PS04 guidance list; and the max-retries screen with the actions `on.max.retries` allows. `Messages` gives the English text of every key (API.md section 7, plus `liveness.button.cancel` and `liveness.button.next`). The Workbench and the Desktop client share both.
 
 ## [0.2.1] - 2026-10-25
 
