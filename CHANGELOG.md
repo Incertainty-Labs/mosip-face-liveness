@@ -4,6 +4,14 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-25
+
+The same code as 0.2.3 and 0.2.4, neither of which JitPack could build. Use 0.2.5.
+
+### Fixed
+
+- JitPack build: 0.2.4's new check that JDK 21 is active stopped the build although JDK 21 was installed. In that step, plain `java` is not the JDK SDKMAN set up, while Maven is. The check is removed; the JDK install from 0.2.4 stays.
+
 ## [0.2.4] - 2026-10-25
 
 The same code as 0.2.3, which JitPack could not build. Use 0.2.4.

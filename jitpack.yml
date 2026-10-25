@@ -5,7 +5,6 @@ before_install:
   - sdk install java 21.0.12-tem || sdk install java 21.0.12-zulu
   - sdk use java 21.0.12-tem || sdk use java 21.0.12-zulu
 install:
-  # Without JDK 21 the build would go on with the image's JDK and fail on unrelated compile errors
-  - java -version 2>&1 | grep -q 'version "21' || { echo "JDK 21 is not active"; exit 1; }
+  # No `java -version` check here: in this step plain `java` is not the JDK that sdk set up, while Maven is (0.2.4)
   - mvn wrapper:wrapper -Dmaven=3.9.9
   - ./mvnw -B install -DskipTests
