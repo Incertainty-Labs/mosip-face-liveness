@@ -60,7 +60,8 @@ public final class ResultCard {
         for (Map.Entry<String, String> d : result.diagnostics().entrySet()) {
             lines.put(d.getKey(), d.getValue());
         }
-        lines.put("Challenges", result.activeUsed() ? result.challengeSummary() : "none (passive pass or failure)");
+        lines.put("Challenges", !result.activeUsed() ? "none drawn"
+                : result.challenges().isEmpty() ? "drawn, none finished" : result.challengeSummary());
         lines.put("Frames", result.framesAnalysed() + " in " + result.durationMs() + " ms ("
                 + String.format("%.1f", result.measuredFps()) + " fps)");
         if (capture != null) {

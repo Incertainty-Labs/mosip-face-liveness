@@ -125,6 +125,18 @@ class WorkbenchRunTest {
     }
 
     @Test
+    @DisplayName("Close or Next after a result returns the overlay to idle")
+    void clear() {
+        Ui ui = new Ui();
+        WorkbenchRun run = run("PASS_PASSIVE", ui, nonce -> fresh(nonce));
+        run.start(Workflow.RESIDENT_REGISTRATION, policy(), false, new Source());
+
+        run.clear();
+
+        assertEquals(UiState.IDLE, ui.last().state());
+    }
+
+    @Test
     @DisplayName("A recorded clip has no device to capture from: a pass ends in success with the capture skipped, and"
             + " the audit says so")
     void clipHasNoCapture() {

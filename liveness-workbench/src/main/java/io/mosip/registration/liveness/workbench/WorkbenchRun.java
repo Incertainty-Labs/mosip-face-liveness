@@ -145,6 +145,11 @@ public final class WorkbenchRun {
         }
     }
 
+    /** Returns the overlay to idle, for example after Close or Next. */
+    public void clear() {
+        overlay.cancelled();
+    }
+
     /** Starts every workflow's attempt count again, as a new registration would. */
     public synchronized void resetAttempts() {
         for (AttemptTracker t : trackers.values()) {
