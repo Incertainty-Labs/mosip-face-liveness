@@ -97,6 +97,68 @@ class GeometricCaptureBinderRulesTest {
                 () -> assertFalse(binder(ONE_FACE, 1.01).verify(passed("a"), FRAME, recent).bound()));
     }
 
+    @Test
+    @DisplayName("A capture of the same scene at twice the stream's resolution scores as at the stream's own: boxes and"
+            + " landmarks are compared at one scale")
+    void captureResolutionDoesNotMatter() {
+        byte[] doubled = new byte[128 * 96 * 3];
+        for (int y = 0; y < 96; y++) {
+            for (int x = 0; x < 128; x++) {
+                System.arraycopy(FRAME.rgb(), ((y / 2) * 64 + x / 2) * 3, doubled, (y * 128 + x) * 3, 3);
+            }
+        }
+        FaceFrame capture = new FaceFrame(128, 96, doubled, 0, 0, "test");
+        float[] landmarks = ONE_FACE.landmarks().clone();
+        for (int i = 0; i < landmarks.length; i++) {
+            landmarks[i] *= 2;
+        }
+        FaceObservation captured = FaceObservation.builder().faces(1, new Rect(32, 16, 64, 64)).landmarks(landmarks)
+                .build();
+
+        BindingResult r = binder(captured, 0.6).verify(passed("a"), capture,
+                Collections.singletonList(new AnalysedFrame(FRAME, ONE_FACE)));
+
+        assertEquals(1.0, r.similarity(), 1e-9);
+    }
+
+    @Test
+    @DisplayName("Recent frames that cannot be compared (no face, two faces, a landmark that is not a number, a box"
+            + " almost outside the frame) are skipped, and the usable one counts; with none usable the capture is not"
+            + " bound")
+    void unusableRecentFramesAreSkipped() {
+        float[] broken = ONE_FACE.landmarks().clone();
+        broken[4] = Float.NaN;
+        List<AnalysedFrame> unusable = java.util.Arrays.asList(
+                new AnalysedFrame(FRAME, FaceObservation.builder().build()),
+                new AnalysedFrame(FRAME, FaceObservation.builder().faces(2, ONE_FACE.box())
+                        .landmarks(ONE_FACE.landmarks()).build()),
+                new AnalysedFrame(FRAME, FaceObservation.builder().faces(1, ONE_FACE.box()).landmarks(broken).build()),
+                new AnalysedFrame(FRAME, FaceObservation.builder().faces(1, new Rect(63, 8, 32, 32))
+                        .landmarks(ONE_FACE.landmarks()).build()));
+        List<AnalysedFrame> withUsable = new java.util.ArrayList<AnalysedFrame>(unusable);
+        withUsable.add(new AnalysedFrame(FRAME, ONE_FACE));
+
+        BindingResult usable = binder(ONE_FACE, 0.6).verify(passed("a"), FRAME, withUsable);
+        BindingResult none = binder(ONE_FACE, 0.6).verify(passed("a"), FRAME, unusable);
+
+        assertAll(() -> assertTrue(usable.bound()), () -> assertEquals(1.0, usable.similarity(), 1e-9),
+                () -> assertFalse(none.bound()), () -> assertEquals(0.0, none.similarity(), 1e-9),
+                () -> assertFalse(none.reason().isEmpty()));
+    }
+
+    @Test
+    @DisplayName("A capture whose face box lies almost outside the image is not bound, even where a recent frame has the"
+            + " same box: a crop of under 2 px cannot be compared")
+    void captureBoxOutsideTheImageIsNotBound() {
+        FaceObservation edge = FaceObservation.builder().faces(1, new Rect(63, 8, 32, 32))
+                .landmarks(ONE_FACE.landmarks()).build();
+
+        BindingResult r = binder(edge, 0.6).verify(passed("a"), FRAME,
+                java.util.Arrays.asList(new AnalysedFrame(FRAME, edge), new AnalysedFrame(FRAME, ONE_FACE)));
+
+        assertAll(() -> assertFalse(r.bound()), () -> assertEquals(0.0, r.similarity(), 1e-9));
+    }
+
     private static GeometricCaptureBinder binder(FaceObservation captured, double min) {
         FaceAnalyzer analyzer = frame -> captured;
         return new GeometricCaptureBinder(analyzer, min);

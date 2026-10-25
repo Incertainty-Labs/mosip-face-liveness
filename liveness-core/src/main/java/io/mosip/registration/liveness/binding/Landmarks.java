@@ -14,24 +14,43 @@ final class Landmarks {
     }
 
     /**
-     * @param a    landmarks as x,y pairs in frame pixels
-     * @param b    the other face's landmarks
-     * @param span the mean distance, relative to {@code a}'s eye distance, at which the agreement reaches 0
+     * @param xy landmarks as x,y pairs
+     * @return whether they hold the five points, all finite
+     */
+    static boolean usable(float[] xy) {
+        double[] p = xy == null ? null : five(xy);
+        if (p == null) {
+            return false;
+        }
+        for (double v : p) {
+            if (Double.isNaN(v) || Double.isInfinite(v)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param a       landmarks as x,y pairs in frame pixels
+     * @param b       the other face's landmarks, in its own frame's pixels
+     * @param bScaleX multiplies {@code b}'s x to bring it to {@code a}'s frame (a's width / b's width)
+     * @param bScaleY multiplies {@code b}'s y likewise
+     * @param span    the mean distance, relative to {@code a}'s eye distance, at which the agreement reaches 0
      * @return agreement 0..1; 0 when either has no usable landmarks
      */
-    static double agreement(float[] a, float[] b, double span) {
-        double[] pa = five(a);
-        double[] pb = five(b);
-        if (pa == null || pb == null) {
+    static double agreement(float[] a, float[] b, double bScaleX, double bScaleY, double span) {
+        if (!usable(a) || !usable(b)) {
             return 0;
         }
+        double[] pa = five(a);
+        double[] pb = five(b);
         double eyes = Math.hypot(pa[2] - pa[0], pa[3] - pa[1]);
         if (eyes <= 0) {
             return 0;
         }
         double sum = 0;
         for (int i = 0; i < 5; i++) {
-            sum += Math.hypot(pa[2 * i] - pb[2 * i], pa[2 * i + 1] - pb[2 * i + 1]);
+            sum += Math.hypot(pa[2 * i] - pb[2 * i] * bScaleX, pa[2 * i + 1] - pb[2 * i + 1] * bScaleY);
         }
         return Math.max(0, 1 - sum / 5 / eyes / span);
     }

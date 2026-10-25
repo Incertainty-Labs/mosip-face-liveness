@@ -45,7 +45,9 @@ class EngineOptionsTest {
                 LivenessContext.builder().workflow(Workflow.RESIDENT_REGISTRATION).build(),
                 LivenessConfigLoader.load(Collections.singletonMap("mosip.registration.face.liveness.enabled", "true"),
                         Workflow.RESIDENT_REGISTRATION), result);
-        for (int n = 0; n < 80 && result.done.getCount() > 0; n++) {
+        // Until the result, up to 20 s of frame time (the session times out at 30 s), so a slow build machine that
+        // analyses fewer of the frames still fills the passive window
+        for (int n = 0; n < 400 && result.done.getCount() > 0; n++) {
             FaceFrame frame = drifted(face, n % 10 < 5 ? n % 10 : 10 - n % 10);
             session.onFrame(new FaceFrame(frame.width(), frame.height(), frame.rgb(), n * 50L, n, "test"));
             Thread.sleep(30);
@@ -79,6 +81,15 @@ class EngineOptionsTest {
         assertAll(() -> assertEquals("AUTO", defaults.requestedProvider()), () -> assertEquals(0, defaults.threads()),
                 () -> assertEquals(1, defaults.detectEvery()),
                 () -> assertEquals("AUTO", EngineOptions.withProvider("TURBO").requestedProvider()));
+    }
+
+    @Test
+    @DisplayName("detectEvery is at most 5: between detections the guard sees the last detection's face count and the"
+            + " passive veto has fewer frames, so the gap stays short")
+    void detectEveryIsCapped() {
+        assertAll(() -> assertEquals(4, EngineOptions.defaults().detectEvery(4).detectEvery()),
+                () -> assertEquals(5, EngineOptions.defaults().detectEvery(5).detectEvery()),
+                () -> assertEquals(5, EngineOptions.defaults().detectEvery(10).detectEvery()));
     }
 
     /**

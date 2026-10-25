@@ -19,17 +19,30 @@ final class PerceptualHash {
 
     /**
      * @param frame the frame
-     * @param box   the face box, clipped to the frame
-     * @return the hash; 0 for an empty box
+     * @param box   the face box
+     * @return whether the box, clipped to the frame, covers at least 2x2 pixels, so that it can be hashed
      */
-    static long of(FaceFrame frame, Rect box) {
+    static boolean covers(FaceFrame frame, Rect box) {
         int x0 = Math.max(0, box.x());
         int y0 = Math.max(0, box.y());
         int x1 = Math.min(frame.width(), box.x() + box.width());
         int y1 = Math.min(frame.height(), box.y() + box.height());
-        if (x1 - x0 < 2 || y1 - y0 < 2) {
+        return x1 - x0 >= 2 && y1 - y0 >= 2;
+    }
+
+    /**
+     * @param frame the frame
+     * @param box   the face box, clipped to the frame
+     * @return the hash; 0 when the box does not {@link #covers cover} the frame
+     */
+    static long of(FaceFrame frame, Rect box) {
+        if (!covers(frame, box)) {
             return 0;
         }
+        int x0 = Math.max(0, box.x());
+        int y0 = Math.max(0, box.y());
+        int x1 = Math.min(frame.width(), box.x() + box.width());
+        int y1 = Math.min(frame.height(), box.y() + box.height());
         double[] grey = shrink(frame, x0, y0, x1, y1);
         double[] dct = dct(grey);
         double[] low = new double[K * K];

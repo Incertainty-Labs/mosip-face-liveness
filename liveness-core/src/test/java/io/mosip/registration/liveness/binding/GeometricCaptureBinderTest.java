@@ -66,6 +66,27 @@ class GeometricCaptureBinderTest {
     }
 
     @Test
+    @DisplayName("TC-ENG-21: the same scene and the drifted scene captured at twice the stream's resolution are bound"
+            + " as at the stream's own")
+    void higherResolutionCaptureIsBound() throws IOException {
+        BufferedImage face = image("mosip-mockmds-face.png");
+        FaceFrame stream = frame(face);
+        int w = face.getWidth() * 2;
+        int h = face.getHeight() * 2;
+        GeometricCaptureBinder binder = new GeometricCaptureBinder(analyzer, MIN_SIMILARITY);
+
+        BindingResult same = binder.verify(passed(), frame(scaled(face, w, h)), recent(stream));
+        BindingResult drifted = binder.verify(passed(), frame(scaled(shifted(face, 8, 4), w, h)), recent(stream));
+        double driftedAtStreamSize = binder.verify(passed(), frame(shifted(face, 8, 4)), recent(stream)).similarity();
+
+        System.out.println("x2: same " + same.similarity() + ", drifted " + drifted.similarity());
+        assertAll(() -> assertTrue(same.similarity() > 0.9, "same " + same.similarity()),
+                () -> assertTrue(drifted.bound(), "drifted " + drifted.similarity()),
+                () -> assertTrue(Math.abs(drifted.similarity() - driftedAtStreamSize) < 0.1,
+                        "drifted " + drifted.similarity() + " vs " + driftedAtStreamSize + " at the stream's size"));
+    }
+
+    @Test
     @DisplayName("TC-ENG-22: a capture of another person, where the live face was, is not bound (LIV-014)")
     void otherPersonIsNotBound() throws IOException {
         FaceFrame stream = frame(image("mosip-mockmds-face.png"));

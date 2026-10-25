@@ -43,11 +43,13 @@ public final class TrackingFaceAnalyzer implements DetectingAnalyzer {
             float[] box = toBox(bounds(lastMesh));
             FaceMesh mesh = models.landmarker().landmarks(frame,
                     new FaceDetection(box[0], box[1], box[2], box[3], new float[0], 1f));
-            if (mesh.presence() >= MIN_PRESENCE) {
+            float[] followed = toBox(bounds(mesh));
+            // A face crossing the frame's edge keeps its presence while the detector already loses it, so it is
+            // detected again rather than followed out of the frame
+            if (mesh.presence() >= MIN_PRESENCE && inside(followed, frame)) {
                 detected = false;
                 sinceDetection++;
                 lastMesh = mesh;
-                float[] followed = toBox(bounds(mesh));
                 return models.observe(frame, mesh, lastFaceCount, followed[0], followed[1], followed[2], followed[3]);
             }
         }
@@ -79,6 +81,10 @@ public final class TrackingFaceAnalyzer implements DetectingAnalyzer {
         lastMesh = mesh;
         lastFaceCount = faces.size();
         return models.observe(frame, mesh, faces.size(), face.x(), face.y(), face.width(), face.height());
+    }
+
+    private static boolean inside(float[] box, FaceFrame frame) {
+        return box[0] >= 0 && box[1] >= 0 && box[0] + box[2] <= frame.width() && box[1] + box[3] <= frame.height();
     }
 
     /** @return min x, min y, max x, max y of the mesh */

@@ -407,7 +407,53 @@ class HybridLivenessEngineTest {
         assertAll(() -> assertEquals(Arrays.asList(0L, 3L, 6L), padFrames, "PAD on detection frames only"),
                 () -> assertEquals(9, vetoFrames.size(), "the veto sees frames 0 to 8"),
                 () -> assertEquals(SessionState.NEUTRAL_HOLD, session.state(),
-                        "three PAD-scored frames fill the passive window"));
+                        "three PAD-scored frames fill the passive window"),
+                () -> assertEquals(Arrays.asList(SessionState.WAITING_FOR_FACE, SessionState.PASSIVE_CHECK,
+                        SessionState.NEUTRAL_HOLD), recorder.states,
+                        "a good frame between detections is not a lost face"));
+    }
+
+    @Test
+    @DisplayName("With an analyzer that detects every 4th frame, a session passes only on a detection frame: a second"
+            + " face that arrives after the last challenge was done, before the next detection, still fails (LIV-005)")
+    void passConfirmedOnDetectionFrame() {
+        Recorder alone = new Recorder();
+        Recorder joined = new Recorder();
+
+        feed(everyFourth(false).startSession(context(), policy(), alone), 0, 3000);
+        feed(everyFourth(true).startSession(context(), policy(), joined), 0, 3000);
+
+        assertAll(() -> assertEquals(SessionState.PASSED, alone.result.finalState()),
+                () -> assertEquals(0, alone.result.durationMs() % (4 * STEP), "passed on a detection frame, at "
+                        + alone.result.durationMs() + " ms"),
+                () -> assertEquals(SessionState.FAILED, joined.result.finalState()),
+                () -> assertEquals(LivenessErrorCode.MULTIPLE_FACES, joined.result.errorCode()));
+    }
+
+    /**
+     * An engine whose analyzer detects on frames 0, 4, 8...; with {@code secondFace}, detection frames from 1500 ms
+     * see two faces, after the neutral hold (from 450 ms) is done on followed frame 29 (1450 ms).
+     */
+    private static HybridLivenessEngine everyFourth(boolean secondFace) {
+        FaceObservation twoFaces = FaceObservation.builder().faces(2, FRONTAL.box()).pose(0, 10, 2).expression(0f, 0f)
+                .eyesOpen(0.8f, 0.8f).quality(0.8f, 0.5f).build();
+        int[] calls = {0};
+        DetectingAnalyzer analyzer = new DetectingAnalyzer() {
+            @Override
+            public FaceObservation analyze(FaceFrame frame) {
+                calls[0]++;
+                return secondFace && detected() && frame.timestampMs() >= 1500 ? twoFaces : FRONTAL;
+            }
+
+            @Override
+            public boolean detected() {
+                return (calls[0] - 1) % 4 == 0;
+            }
+        };
+        return new HybridLivenessEngine(new EngineParts(minScore -> analyzer,
+                () -> Collections.<PadDetector>singletonList(new Fixed("minifasnet_v2", 0.95)),
+                (policy, source, r) -> sequence(Collections.<ChallengeType>emptyList(), policy), new SecureRandom(),
+                Runnable::run, new EngineInfo("test", Collections.<String, String>emptyMap(), "CPU")));
     }
 
     /** A passive pass over frames whose pixels are {@link #pixels}; {@code tamper} changes one pixel of frame 5. */

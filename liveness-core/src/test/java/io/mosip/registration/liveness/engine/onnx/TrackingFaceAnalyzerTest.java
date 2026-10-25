@@ -79,9 +79,53 @@ class TrackingFaceAnalyzerTest {
         boolean goneDetected = tracking.detected();
         FaceObservation back = tracking.analyze(moving(2));
 
+        boolean backDetected = tracking.detected();
+        List<Boolean> after = new ArrayList<Boolean>();
+        for (int n = 3; n < 6; n++) {
+            tracking.analyze(moving(n));
+            after.add(tracking.detected());
+        }
+
         assertAll(() -> assertEquals(0, gone.faceCount()), () -> assertTrue(goneDetected, "a lost face is looked for"),
-                () -> assertTrue(tracking.detected(), "and found again by the detector"),
-                () -> assertEquals(1, back.faceCount()));
+                () -> assertTrue(backDetected, "and found again by the detector"),
+                () -> assertEquals(1, back.faceCount()),
+                () -> assertEquals(java.util.Arrays.asList(false, false, true), after,
+                        "the count starts again from that detection: followed, followed, detected"));
+    }
+
+    @Test
+    @DisplayName("A face leaving through the frame's edge is detected again as soon as the followed box would cross"
+            + " the edge, so no followed frame reports a face partly outside the frame or one the detector lost")
+    void faceLeavingTheFrameIsDetectedAgain() throws IOException {
+        TrackingFaceAnalyzer tracking = analyzer.tracking(5);
+        int followedFrames = 0;
+
+        for (int n = 0; n < 16; n++) {
+            FaceFrame frame = sliding(300 + 25 * n);
+            FaceObservation tracked = tracking.analyze(frame);
+            if (!tracking.detected()) {
+                followedFrames++;
+                Rect b = tracked.box();
+                int frameNo = n;
+                assertAll(() -> assertEquals(analyzer.analyze(frame).faceCount(), tracked.faceCount(),
+                        "frame " + frameNo + ": the face count a full detection gives"),
+                        () -> assertTrue(b.x() >= 0 && b.y() >= 0 && b.x() + b.width() <= frame.width()
+                                && b.y() + b.height() <= frame.height(), "frame " + frameNo + ": box " + b.x() + ","
+                                        + b.y() + " " + b.width() + "x" + b.height() + " inside the frame"));
+            }
+        }
+        assertTrue(followedFrames >= 4, "the face was followed between detections: " + followedFrames);
+    }
+
+    /** MOSIP's 240x320 face photo at {@code x} on a 640x480 grey canvas, leaving through the right edge as x grows. */
+    static FaceFrame sliding(int x) throws IOException {
+        BufferedImage canvas = new BufferedImage(640, 480, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = canvas.createGraphics();
+        g.setColor(new Color(128, 128, 128));
+        g.fillRect(0, 0, 640, 480);
+        g.drawImage(YuNetDetectorTest.face(), x, 80, null);
+        g.dispose();
+        return YuNetDetectorTest.frame(canvas);
     }
 
     /** MOSIP's 240x320 face photo at x = 100 + 6n on a 640x480 grey canvas. */

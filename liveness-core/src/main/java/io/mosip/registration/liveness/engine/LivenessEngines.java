@@ -3,6 +3,7 @@ package io.mosip.registration.liveness.engine;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import io.mosip.registration.liveness.api.EngineInfo;
+import io.mosip.registration.liveness.api.FaceAnalyzer;
 import io.mosip.registration.liveness.api.LivenessEngine;
 import io.mosip.registration.liveness.api.LivenessErrorCode;
 import io.mosip.registration.liveness.api.LivenessException;
@@ -13,7 +14,9 @@ import io.mosip.registration.liveness.engine.onnx.OnnxFaceAnalyzer;
 import io.mosip.registration.liveness.engine.onnx.Sessions;
 import io.mosip.registration.liveness.model.ModelRegistry;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -68,15 +71,32 @@ public final class LivenessEngines {
 
     private static LivenessEngine build(ModelRegistry models, EngineOptions options, String provider)
             throws LivenessException {
+        return build(models, options, provider, new ArrayList<AutoCloseable>());
+    }
+
+    /** @param loaded receives each model as it loads */
+    static LivenessEngine build(ModelRegistry models, EngineOptions options, String provider,
+            List<AutoCloseable> loaded) throws LivenessException {
         final OnnxFaceAnalyzer analyzer;
         final MiniFasNetPadDetector v2;
         final MiniFasNetPadDetector v1se;
         try {
             OrtSession.SessionOptions session = Sessions.options(provider, options.threads());
             analyzer = OnnxFaceAnalyzer.load(models, LivenessConfigLoader.DEFAULT_DETECTOR_MIN_SCORE, session);
+            loaded.add(analyzer);
             v2 = MiniFasNetPadDetector.load(models, "minifasnet_v2", 2.7, session);
+            loaded.add(v2);
             v1se = MiniFasNetPadDetector.load(models, "minifasnet_v1se", 4.0, session);
+            loaded.add(v1se);
         } catch (OrtException | RuntimeException e) {
+            // Native sessions are not garbage collected, so the models that did load are closed before giving up
+            for (int i = loaded.size() - 1; i >= 0; i--) {
+                try {
+                    loaded.get(i).close();
+                } catch (Exception closing) {
+                    e.addSuppressed(closing);
+                }
+            }
             throw new LivenessException(LivenessErrorCode.ENGINE_ERROR, "Cannot load the models on " + provider + ": "
                     + e.getMessage());
         }
@@ -86,15 +106,21 @@ public final class LivenessEngines {
             return thread;
         });
         return new HybridLivenessEngine(new EngineParts(
-                // Each session gets its own view; with sparse detection it is a per-session tracker
-                minScore -> options.detectEvery() > 1 ? analyzer.tracking(minScore, options.detectEvery())
-                        : analyzer.withMinScore(minScore),
+                minScore -> perSession(analyzer, minScore, options.detectEvery()),
                 // The static-stream veto is stateful, so each session gets its own
                 () -> Arrays.<PadDetector>asList(v2, v1se, new StaticStreamDetector()),
                 new RandomChallengeGenerator(true),
                 new SecureRandom(),
                 workers,
                 new EngineInfo(HYBRID_VERSION, models.versions(), provider)));
+    }
+
+    /**
+     * Each session gets its own view of the shared models; with sparse detection it is a per-session tracker, since a
+     * tracker holds that session's face.
+     */
+    static FaceAnalyzer perSession(OnnxFaceAnalyzer analyzer, double minScore, int detectEvery) {
+        return detectEvery > 1 ? analyzer.tracking(minScore, detectEvery) : analyzer.withMinScore(minScore);
     }
 
     /** The real engine's version, reported in every result and in the packet evidence. */

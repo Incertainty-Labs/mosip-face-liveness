@@ -76,6 +76,8 @@ final class HybridSession implements LivenessSession {
     private Challenge challenge;
     private ChallengeVerifier verifier;
     private long challengeStartMs;
+    /** The last challenge is done on a frame the detector did not see; the pass waits for the next detection. */
+    private boolean confirming;
 
     HybridSession(EngineParts parts, LivenessContext context, LivenessPolicy policy, LivenessCallback callback) {
         this.parts = parts;
@@ -167,7 +169,7 @@ final class HybridSession implements LivenessSession {
                     finish(SessionState.FAILED, Decision.INCONCLUSIVE, broken, now);
                     return;
                 }
-                challengeStep(observation, now);
+                challengeStep(observation, detected, now);
                 break;
             default:
                 break;
@@ -232,7 +234,14 @@ final class HybridSession implements LivenessSession {
         callback.onChallenge(challenge, index, sequence.size());
     }
 
-    private void challengeStep(FaceObservation observation, long now) {
+    private void challengeStep(FaceObservation observation, boolean detected, long now) {
+        if (confirming) {
+            // Between detections the face count is the last detection's, so the guard has just checked a fresh one
+            if (detected) {
+                finish(SessionState.PASSED, Decision.LIVE, null, now);
+            }
+            return;
+        }
         // The step's countdown: how much of the challenge's time is used
         callback.onProgress(Math.min(1f, (float) (now - challengeStartMs) / challenge.timeoutMs()));
         ChallengeProgress progress = verifier.update(challenge, observation, now);
@@ -243,8 +252,11 @@ final class HybridSession implements LivenessSession {
             outcomes.add(new ChallengeOutcome(challenge.type(), progress, now - challengeStartMs));
             if (challengeIndex + 1 < sequence.size()) {
                 startChallenge(challengeIndex + 1, now);
-            } else {
+            } else if (detected) {
                 finish(SessionState.PASSED, Decision.LIVE, null, now);
+            } else {
+                // A pass is decided only where the detector ran, so a second face cannot slip in between detections
+                confirming = true;
             }
         }
     }

@@ -12,7 +12,8 @@ public final class BindingResult {
      * @param bound          whether the capture is bound to the session
      * @param similarity     similarity 0..1 that was compared with {@code bind.min.similarity}
      * @param reason         why binding failed, for audit; empty when bound
-     * @param evidenceDigest the session digest extended with the SHA-256 of the signed image, hex
+     * @param evidenceDigest the session digest extended with the SHA-256 of the signed capture the binder compared
+     *                       (for {@code GeometricCaptureBinder}, its decoded pixels), hex
      * @throws IllegalArgumentException if the similarity is outside 0..1
      */
     public BindingResult(boolean bound, double similarity, String reason, String evidenceDigest) {
