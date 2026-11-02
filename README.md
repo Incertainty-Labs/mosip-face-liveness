@@ -1,10 +1,39 @@
+<div align="center">
+
 # MOSIP Face Liveness
 
-Hybrid passive and active face liveness and presentation attack detection (PAD) for the MOSIP Desktop and Android Registration Clients. One shared engine checks face frames for liveness with no user action, escalates to random facial challenges when confidence is low, and blocks face capture and operator or supervisor authentication when liveness fails. Everything runs offline.
+**Hybrid passive and active face liveness and presentation attack detection (PAD) for the MOSIP Desktop and Android Registration Clients.**
+
+[![build](https://github.com/Incertainty-Labs/mosip-face-liveness/actions/workflows/build.yml/badge.svg)](https://github.com/Incertainty-Labs/mosip-face-liveness/actions/workflows/build.yml)
+[![JitPack](https://jitpack.io/v/Incertainty-Labs/mosip-face-liveness.svg)](https://jitpack.io/#Incertainty-Labs/mosip-face-liveness)
+[![Licence: MPL 2.0](https://img.shields.io/badge/licence-MPL%202.0-blue.svg)](LICENSE)
+![Java 8 | 11](https://img.shields.io/badge/java-8%20core%20%7C%2011%20desktop-orange.svg)
+![Tests](https://img.shields.io/badge/tests-381%20passing-brightgreen.svg)
+![MOSIP Decode 2026](https://img.shields.io/badge/MOSIP%20Decode%202026-PS04-0b5394.svg)
+
+[Quick start](#quick-start-the-liveness-workbench) · [Architecture](#architecture) · [Desktop client](#desktop-registration-client) · [Configuration](#configuration) · [Library](#use-the-library) · [Changelog](CHANGELOG.md)
+
+</div>
+
+---
+
+One shared engine checks every face frame for liveness with no action from the resident, escalates to random facial challenges when it is not confident, and blocks the face capture when liveness fails. It runs fully offline, on the Desktop and on the phone.
 
 Built for MOSIP Decode 2026, Problem Statement 04, by team Incertainty.
 
-> **Status:** `v0.2.5`. The real engine (`HybridLivenessEngine`), the Desktop overlay and liveness gate, the Liveness Workbench, and the Desktop Registration Client integration. Liveness is **off by default**; every rule is MOSIP configuration. See [CHANGELOG.md](CHANGELOG.md).
+> [!NOTE]
+> **v0.2.5** is the current release: the real engine, the Desktop overlay and liveness gate, the Liveness Workbench, and the Desktop Registration Client integration. Liveness is **off by default**, and every rule is MOSIP configuration.
+
+## Highlights
+
+| | |
+| --- | --- |
+| **Passive first** | Two MiniFASNet PAD models, fused and taken as a median over a window, plus a veto for frozen streams. A real face passes in about 3 s with nothing to do. |
+| **Active when needed** | 2 to 3 random challenges (turn, look up, smile, open mouth, close eyes, blink) and a final neutral hold, from Face Mesh landmarks and blendshapes. |
+| **Attacks refused before capture** | Photos and video replays on a phone screen, and frozen device streams, end in LIV-008 before the device is asked for the face. |
+| **Per-workflow policy** | Each of the seven MOSIP workflows has its own mode, challenges and attempt limit, with BLOCK, SUPERVISOR_OVERRIDE or EXCEPTION_FLOW at the limit. |
+| **Capture binding** | In the Workbench, the signed capture after a pass is checked against the session: signature, echoed nonce, time, and the same scene. |
+| **One engine, two clients** | `liveness-core` targets Java 8, so the same code runs in the Desktop client and on Android (API 28). |
 
 ## Architecture
 
@@ -37,33 +66,35 @@ flowchart LR
 ```
 
 1. The face device streams frames. On the Desktop, the client's own stream is tapped, so no second stream is opened on the device.
-2. The engine runs a passive check on every frame: two MiniFASNet PAD models, fused and taken as a median over a window, plus a veto for frozen streams. When policy asks, or confidence is low, it adds 2 to 3 random challenges and a final neutral hold.
-3. Only a pass lets the client ask the device for the face. Failures are counted per face field (`max.retries`), and the attempt limit follows `on.max.retries`.
-4. In the Workbench, the signed capture after a pass is also checked against the session: signature, echoed nonce, time, and the same scene as the live frames.
+2. The engine runs the passive check on every frame and adds challenges when policy asks or confidence is low.
+3. Only a pass lets the client ask the device for the face. Failures are counted per face field, and the attempt limit follows `on.max.retries`.
+4. In the Workbench, the signed capture after a pass is also checked against the live session.
 
-## Modules
+### Modules
 
 | Module | Java | Purpose |
 | --- | --- | --- |
-| `liveness-core` | `--release 8` | Engine contract and implementation, shared by Desktop and Android (API 28) |
-| `face-verification` | `--release 8` | 1:1 face verification (YuNet alignment + SFace), shared by both clients |
+| `liveness-core` | 8 | Engine contract and implementation, shared by Desktop and Android |
+| `face-verification` | 8 | 1:1 face verification (YuNet alignment + SFace) |
 | `liveness-desktop` | 11 | Desktop frame sources (`MjpegFrameSource`, `PushFrameSource`), `LivenessGate`, JavaFX overlay |
-| `liveness-eval` | 11 | Clip replay source for evaluation |
-| `liveness-workbench` | 11 | The Liveness Workbench: the Desktop demo and test app (never part of the Registration Client) |
+| `liveness-eval` | 11 | Clip playback for evaluation |
+| `liveness-workbench` | 11 | The Liveness Workbench, the Desktop demo and test app (never part of the client) |
 
-Related repositories:
+### Related repositories
 
-- [registration-client](https://github.com/Incertainty-Labs/registration-client), branch `ps04/liveness`: Desktop client integration
-- [android-registration-client](https://github.com/Incertainty-Labs/android-registration-client), branch `ps04/liveness`: Android client integration
-- [mosip-mock-services](https://github.com/Incertainty-Labs/mosip-mock-services), branch `master`: MockMDS with a live face stream from a webcam or a clip, capture from the stream, and attack profiles
+| Repository | Branch | What it holds |
+| --- | --- | --- |
+| [registration-client](https://github.com/Incertainty-Labs/registration-client/tree/ps04/liveness) | `ps04/liveness` | Desktop Registration Client integration |
+| [android-registration-client](https://github.com/Incertainty-Labs/android-registration-client/tree/ps04/liveness) | `ps04/liveness` | Android Registration Client integration |
+| [mosip-mock-services](https://github.com/Incertainty-Labs/mosip-mock-services) | `master` | MockMDS with a live face stream from a webcam or a clip, and attack profiles |
 
-## Run the Liveness Workbench (Desktop demo)
+## Quick start: the Liveness Workbench
 
-The Workbench runs a liveness check the way the Desktop client does, on a MockMDS stream or a recorded clip, and shows the overlay, the result card (PAD scores, capture signature, freshness, scene binding) and an audit pane.
+The Workbench runs a liveness check the way the Desktop client does, on a MockMDS stream or a recorded clip. It shows the overlay, a result card (PAD scores, capture signature, freshness, scene binding) and an audit pane.
 
-**Requirements:** a JDK 11 or 21 **with JavaFX** (for example Azul Zulu FX), Maven 3.9, and a webcam for live use. MockMDS needs Java 21.
+**You need:** a JDK 11 or 21 **with JavaFX** (for example Azul Zulu FX), Maven 3.9, and a webcam for live use. MockMDS needs Java 21.
 
-### 1. Start MockMDS
+**1. Start MockMDS**
 
 ```bash
 git clone https://github.com/Incertainty-Labs/mosip-mock-services.git
@@ -73,17 +104,16 @@ cd target
 java -cp "mock-mds-1.3.1.jar;lib/*" io.mosip.mock.sbi.test.TestMockSBI "mosip.mock.sbi.device.purpose=Registration" "mosip.mock.sbi.biometric.type=Biometric Device"
 ```
 
-On Linux or macOS use `:` instead of `;` in the classpath. MockMDS listens on the first free port from 4501.
+On Linux or macOS, use `:` instead of `;` in the classpath. MockMDS listens on the first free port from 4501.
 
-### 2. Start the Workbench
-
-Windows, from this repository:
+**2. Start the Workbench** from this repository
 
 ```bat
 liveness-workbench\workbench.cmd
 ```
 
-Any OS, the same steps by hand:
+<details>
+<summary>Linux, macOS, or by hand</summary>
 
 ```bash
 mvn -q -pl liveness-workbench -am install -DskipTests
@@ -93,15 +123,24 @@ java -Dworkbench.models=models -cp "liveness-workbench/target/classes:liveness-w
 
 Optional system properties: `workbench.config` (a properties file with liveness keys; the default is a bundled demo config with liveness on) and `workbench.recordings` (where **Record** writes clips).
 
-### 3. Try it
+</details>
 
-1. Source **MockMDS stream**, device `127.0.0.1:4501`, profile **webcam**. Pick a workflow (all seven MOSIP workflows) and press **Start**.
-2. A real face passes the passive check in about 3 s. The capture follows, and the result card shows "capture bound".
-3. Set Mode to **ACTIVE** to get random challenges (turn, look up, smile, open mouth, close eyes, blink), then the neutral hold.
-4. Attacks: hold a photo on a phone screen to the webcam, or switch the profile to **static** (a frozen image). Both are refused before any capture (LIV-008). The `bonafide`, `print`, `screen` and `replay` profiles stream a clip you supply as `MockMDS/target/clips/<profile>.mjpeg`, for example one recorded with the Workbench's **Record**; no clips ship, since they would show people's faces. A clip can also be played directly with the Workbench's **Recorded clip** source.
-5. **Reset attempts** starts the attempt count again; after `max.retries` failures the overlay shows the attempts-used-up screen.
+**3. Try it**
 
-## Desktop Registration Client integration
+1. Source **MockMDS stream**, device `127.0.0.1:4501`, profile **webcam**. Pick any of the seven workflows and press **Start**.
+2. A real face passes in about 3 s. The capture follows, and the result card shows "capture bound".
+3. Set Mode to **ACTIVE** for random challenges and the neutral hold.
+4. Hold a photo on a phone screen to the webcam, or switch the profile to **static** (a frozen image). Both are refused before any capture.
+5. **Reset attempts** starts the count again; after `max.retries` failures the overlay shows the attempts-used-up screen.
+
+<details>
+<summary>Playing your own clips</summary>
+
+The `bonafide`, `print`, `screen` and `replay` profiles stream a clip you supply as `MockMDS/target/clips/<profile>.mjpeg`, for example one recorded with the Workbench's **Record**. No clips ship, since they would show people's faces. A clip can also be played directly with the Workbench's **Recorded clip** source.
+
+</details>
+
+## Desktop Registration Client
 
 In the [registration-client fork](https://github.com/Incertainty-Labs/registration-client/tree/ps04/liveness) (MOSIP `master`, 1.2.0.2, Java 11):
 
@@ -109,16 +148,15 @@ In the [registration-client fork](https://github.com/Incertainty-Labs/registrati
 - `ResidentLivenessCheck` runs a `LivenessGate` per face field and shows it in a `LivenessOverlay` window.
 - `GenericBiometricsController` asks the device for the face only after a pass. With no attempt left, Scan stays off (LIV-011). The exception photo is checked passive only. If liveness is on but the engine cannot load, the capture is blocked.
 
-Build with a JDK 11 that includes JavaFX: `cd registration && mvn clean install -Dgpg.skip -DskipTests`. The client takes `liveness-core` and `liveness-desktop` v0.2.5 from JitPack.
-
-Enable it through the client's synced configuration:
+Build with a JDK 11 that includes JavaFX: `cd registration && mvn clean install -Dgpg.skip -DskipTests`. The client takes `liveness-core` and `liveness-desktop` v0.2.5 from JitPack. Enable liveness through the client's synced configuration:
 
 ```properties
 mosip.registration.face.liveness.enabled=true
 mosip.registration.face.liveness.model.dir=<path to this repository's models folder>
 ```
 
-**Not shown end to end:** a registration in the real client needs an onboarded operator on a MOSIP server. On MOSIP Collab, operator onboarding was still pending at submission, so the Workbench is the Desktop demo.
+> [!IMPORTANT]
+> A registration in the real client needs an onboarded operator on a MOSIP server. On MOSIP Collab, operator onboarding was still pending at submission, so the Liveness Workbench is the Desktop demo.
 
 ## Configuration
 
@@ -137,15 +175,13 @@ All keys start with `mosip.registration.face.liveness.`, and each can be set per
 
 ## Build and test
 
-Requirements: JDK 21 and Maven 3.9.
-
 ```bash
 mvn -B verify
 ```
 
-381 automated tests at v0.2.5: `liveness-core` 273, `face-verification` 19, `liveness-desktop` 52, `liveness-eval` 4, `liveness-workbench` 33. CI runs them on every push.
+Needs JDK 21 and Maven 3.9. 381 automated tests at v0.2.5 (`liveness-core` 273, `face-verification` 19, `liveness-desktop` 52, `liveness-eval` 4, `liveness-workbench` 33), run by CI on every push.
 
-## Using the library
+## Use the library
 
 Published through JitPack:
 
